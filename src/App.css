@@ -1,0 +1,134 @@
+#root {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+.mis-page .form-control,
+.mis-page .form-select {
+  font-size: 0.875rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.mis-page .form-label {
+  margin-bottom: 0.25rem;
+}
+
+.mis-page .form-check-label {
+  font-size: 0.875rem;
+}
+
+.mis-scroll-area {
+  max-height: 70vh;
+}
+
+.mis-drawer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1050;
+}
+
+.mis-drawer.is-open {
+  pointer-events: auto;
+}
+
+.mis-drawer__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.mis-drawer.is-open .mis-drawer__backdrop {
+  opacity: 1;
+}
+
+.mis-drawer__panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: min(520px, 100%);
+  background: #fff;
+  box-shadow: -8px 0 20px rgba(0, 0, 0, 0.15);
+  transform: translateX(100%);
+  transition: transform 0.2s ease;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.mis-drawer.is-open .mis-drawer__panel {
+  transform: translateX(0);
+}
+
+.mis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.excel-grid {
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  overflow: auto;
+  max-height: 72vh;
+  background: #fff;
+}
+
+.excel-grid table {
+  margin: 0;
+  min-width: 1800px;
+}
+
+.excel-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8f9fa;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.excel-grid td {
+  min-width: 160px;
+  white-space: nowrap;
+}

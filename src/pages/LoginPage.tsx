@@ -1,0 +1,96 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { apiPost } from "../api/client";
+import { clearAuthToken } from "../api/http";
+import { API_ENDPOINTS } from "../api/contracts/endpoints";
+import type { LoginRequest, LoginResponse } from "../api/contracts/types";
+
+function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      clearAuthToken();
+      const payload: LoginRequest = { Email: email, Password: password };
+      await apiPost<LoginResponse, LoginRequest>(API_ENDPOINTS.LOGIN, payload);
+      navigate("/dashboard", { replace: true });
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Login failed";
+      setError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="container min-vh-100 d-flex align-items-center justify-content-center py-5">
+      <div className="w-100 mx-auto" style={{ maxWidth: "420px" }}>
+        <div className="mb-4">
+          <div className="d-flex align-items-center justify-content-center gap-3">
+            <h1 className="h3 mb-0">Arbour</h1>
+            <img src="/brand.png" alt="Arbour" style={{ height: "40px" }} />
+            <h1 className="h3 mb-0">Borrower Portal</h1>
+          </div>
+          <p className="text-muted text-center mt-2 mb-0">Use the email registered with AIMS to sign in.</p>
+        </div>
+
+        <div className="card shadow-sm border-0">
+          <div className="card-body p-4">
+            <form onSubmit={handleSubmit}>
+              <div className="mb-3">
+                <label className="form-label" htmlFor="email">
+                  Email address
+                </label>
+                <input
+                  className="form-control"
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="you@company.com"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label" htmlFor="password">
+                  Password
+                </label>
+                <input
+                  className="form-control"
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                />
+              </div>
+
+              {error ? <div className="alert alert-danger small py-2">{error}</div> : null}
+
+              <button className="btn btn-primary w-100" type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Signing in..." : "Sign in"}
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <p className="text-center text-muted small mt-3 mb-0">Authorized business users only.</p>
+      </div>
+    </div>
+  );
+}
+
+export default LoginPage;
