@@ -286,62 +286,68 @@ function ReviewSalesMisPage() {
               <div className="row g-3">
                 <div className="col-6 col-md-4">
                   <div className="border rounded p-2 bg-white">
-                    <div className="text-muted small">Units sold this month</div>
-                    <div className="fw-semibold">{formatNumber(comparison.UnitsSoldThisMonth)}</div>
+                    <div className="text-muted small">Units sold during period</div>
+                    <div className="fw-semibold">{formatNumber(comparison.UnitsSoldDuringPeriod)}</div>
                   </div>
                 </div>
                 <div className="col-6 col-md-4">
                   <div className="border rounded p-2 bg-white">
-                    <div className="text-muted small">Units cancelled this month</div>
-                    <div className="fw-semibold">{formatNumber(comparison.UnitsCancelledThisMonth)}</div>
+                    <div className="text-muted small">Units cancelled during period</div>
+                    <div className="fw-semibold">{formatNumber(comparison.UnitsCancelledDuringPeriod)}</div>
                   </div>
                 </div>
                 <div className="col-6 col-md-4">
                   <div className="border rounded p-2 bg-white">
-                    <div className="text-muted small">Demand raised this month</div>
-                    <div className="fw-semibold">{formatNumber(comparison.DemandRaisedThisMonth)}</div>
+                    <div className="text-muted small">Total demand till date</div>
+                    <div className="fw-semibold">{formatNumber(comparison.TotalDemandTillDate)}</div>
                   </div>
                 </div>
                 <div className="col-6 col-md-4">
                   <div className="border rounded p-2 bg-white">
-                    <div className="text-muted small">Demand increase</div>
-                    <div className="fw-semibold text-success">+{formatNumber(comparison.DemandIncrease)}</div>
+                    <div className="text-muted small">Total collection till date</div>
+                    <div className="fw-semibold">{formatNumber(comparison.TotalCollectionTillDate)}</div>
                   </div>
                 </div>
                 <div className="col-6 col-md-4">
                   <div className="border rounded p-2 bg-white">
-                    <div className="text-muted small">Demand decrease</div>
-                    <div className="fw-semibold text-danger">−{formatNumber(comparison.DemandDecrease)}</div>
+                    <div className="text-muted small">Total sales value till date</div>
+                    <div className="fw-semibold">{formatNumber(comparison.TotalSalesValueTillDate)}</div>
                   </div>
                 </div>
                 <div className="col-6 col-md-4">
                   <div className="border rounded p-2 bg-white">
-                    <div className="text-muted small">Received this month</div>
-                    <div className="fw-semibold">{formatNumber(comparison.ReceivedThisMonth)}</div>
+                    <div className="text-muted small">Incremental demand</div>
+                    <div className="fw-semibold text-success">+{formatNumber(comparison.IncrementalDemand)}</div>
                   </div>
                 </div>
                 <div className="col-6 col-md-4">
                   <div className="border rounded p-2 bg-white">
-                    <div className="text-muted small">Collection increase</div>
-                    <div className="fw-semibold text-success">+{formatNumber(comparison.CollectionIncrease)}</div>
+                    <div className="text-muted small">Reduction in demand</div>
+                    <div className="fw-semibold text-danger">−{formatNumber(comparison.ReductionInDemand)}</div>
                   </div>
                 </div>
                 <div className="col-6 col-md-4">
                   <div className="border rounded p-2 bg-white">
-                    <div className="text-muted small">Collection decrease</div>
-                    <div className="fw-semibold text-danger">−{formatNumber(comparison.CollectionDecrease)}</div>
+                    <div className="text-muted small">Incremental collection</div>
+                    <div className="fw-semibold text-success">+{formatNumber(comparison.IncrementalCollection)}</div>
                   </div>
                 </div>
                 <div className="col-6 col-md-4">
                   <div className="border rounded p-2 bg-white">
-                    <div className="text-muted small">Sales value increase</div>
-                    <div className="fw-semibold text-success">+{formatNumber(comparison.SalesValueIncrease)}</div>
+                    <div className="text-muted small">Reduction in collection</div>
+                    <div className="fw-semibold text-danger">−{formatNumber(comparison.ReductionInCollection)}</div>
                   </div>
                 </div>
                 <div className="col-6 col-md-4">
                   <div className="border rounded p-2 bg-white">
-                    <div className="text-muted small">Sales value decrease</div>
-                    <div className="fw-semibold text-danger">−{formatNumber(comparison.SalesValueDecrease)}</div>
+                    <div className="text-muted small">Incremental sales value</div>
+                    <div className="fw-semibold text-success">+{formatNumber(comparison.IncrementalSalesValue)}</div>
+                  </div>
+                </div>
+                <div className="col-6 col-md-4">
+                  <div className="border rounded p-2 bg-white">
+                    <div className="text-muted small">Reduction in sales value</div>
+                    <div className="fw-semibold text-danger">−{formatNumber(comparison.ReductionInSalesValue)}</div>
                   </div>
                 </div>
                 <div className="col-6 col-md-4">
@@ -350,27 +356,15 @@ function ReviewSalesMisPage() {
                     <div className="fw-semibold">{formatNumber(comparison.TotalUnitsWithWarnings)}</div>
                   </div>
                 </div>
-                <div className="col-6 col-md-4">
-                  <div className="border rounded p-2 bg-white">
-                    <div className="text-muted small">Warnings without commentary</div>
-                    <div className="fw-semibold text-warning">{formatNumber(comparison.TotalUnitsWithWarningsWithoutCommentary)}</div>
-                  </div>
-                </div>
-                <div className="col-6 col-md-4">
-                  <div className="border rounded p-2 bg-white">
-                    <div className="text-muted small">Warnings with commentary</div>
-                    <div className="fw-semibold">{formatNumber(comparison.TotalUnitsWithWarningsWithCommentary)}</div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
 
-          {comparison.CurrentWarnings && comparison.CurrentWarnings.length > 0 && (
+          {comparison.UnitsWithWarnings && comparison.UnitsWithWarnings.length > 0 && (
             <div className="card shadow-sm border-0">
               <div className="card-header bg-light d-flex justify-content-between align-items-center">
                 <h3 className="h6 mb-0">Warnings</h3>
-                <span className="badge bg-warning text-dark">{comparison.CurrentWarnings.length} unit(s)</span>
+                <span className="badge bg-warning text-dark">{comparison.UnitsWithWarnings.length} unit(s)</span>
               </div>
               <div className="card-body p-0">
                 <div className="table-responsive">
@@ -386,52 +380,13 @@ function ReviewSalesMisPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {comparison.CurrentWarnings.map((w, i) => (
+                      {comparison.UnitsWithWarnings.map((w, i) => (
                         <tr key={`${w.UnitNumber}-${w.UnitUniqueNumber}-${i}`}>
                           <td>{w.UnitNumber}</td>
                           <td className="text-warning">{w.Warnings || "—"}</td>
                           <td>{w.Commentary || "—"}</td>
                           <td className="text-center">
                             {w.HasCommentary ? <span className="badge bg-success">Yes</span> : <span className="badge bg-secondary">No</span>}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {comparison.Anomalies && comparison.Anomalies.length > 0 && (
-            <div className="card shadow-sm border-0">
-              <div className="card-header bg-light d-flex justify-content-between align-items-center">
-                <h3 className="h6 mb-0">Anomalies</h3>
-                <span className="badge bg-info">{comparison.Anomalies.length} unit(s)</span>
-              </div>
-              <div className="card-body p-0">
-                <div className="table-responsive">
-                  <table className="table table-hover align-middle mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th scope="col">Unit #</th>
-                        <th scope="col">Changed fields</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {comparison.Anomalies.map((a, i) => (
-                        <tr key={`${a.UnitNumber}-${a.UnitUniqueNumber}-${i}`}>
-                          <td>{a.UnitNumber}</td>
-                          <td>
-                            {Array.isArray(a.ChangedFields) && a.ChangedFields.length > 0 ? (
-                              <ul className="list-unstyled mb-0">
-                                {a.ChangedFields.map((f, j) => (
-                                  <li key={j}>{f}</li>
-                                ))}
-                              </ul>
-                            ) : (
-                              "—"
-                            )}
                           </td>
                         </tr>
                       ))}

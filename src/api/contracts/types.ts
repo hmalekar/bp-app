@@ -185,7 +185,7 @@ export interface UnitAmountChangeDto {
   CurrentReceived: number;
   ReceivedDifference: number;
 }
-export interface SalesMisComparisonResultDto {
+/* export interface SalesMisComparisonResultDto {
   UnitsSoldThisMonth: number;
   UnitsCancelledThisMonth: number;
   DemandRaisedThisMonth: number;
@@ -204,4 +204,22 @@ export interface SalesMisComparisonResultDto {
   TotalUnitsWithWarnings: number;
   TotalUnitsWithWarningsWithoutCommentary: number;
   TotalUnitsWithWarningsWithCommentary: number;
+} */
+export interface SalesMisComparisonResultDto {
+  UnitsSoldDuringPeriod: number;
+  UnitsCancelledDuringPeriod: number;
+  NewlySoldUnits: SalesMisRecordDto[];
+  CancelledUnits: SalesMisRecordDto[];
+  TotalDemandTillDate: number;
+  TotalCollectionTillDate: number;
+  TotalSalesValueTillDate: number;
+  IncrementalDemand: number;
+  ReductionInDemand: number;
+  IncrementalCollection: number;
+  ReductionInCollection: number;
+  IncrementalSalesValue: number;
+  ReductionInSalesValue: number;
+  AmountChanges: UnitAmountChangeDto[];
+  UnitsWithWarnings: UnitWarningDto[];
+  TotalUnitsWithWarnings: number;
 }
