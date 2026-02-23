@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiPost } from "../api/client";
-import { clearAuthToken } from "../api/http";
+import { clearAuthToken, clearCurrentUser, clearUserRole, setCurrentUser, setUserRole } from "../api/http";
 import { API_ENDPOINTS } from "../api/contracts/endpoints";
 import type { LoginRequest, LoginResponse } from "../api/contracts/types";
 
@@ -18,8 +18,12 @@ function LoginPage() {
     setIsSubmitting(true);
     try {
       clearAuthToken();
+      clearUserRole();
+      clearCurrentUser();
       const payload: LoginRequest = { Email: email, Password: password };
-      await apiPost<LoginResponse, LoginRequest>(API_ENDPOINTS.LOGIN, payload);
+      const response = await apiPost<LoginResponse, LoginRequest>(API_ENDPOINTS.LOGIN, payload);
+      setUserRole(response.Role ?? "");
+      setCurrentUser(response.Email ?? "");
       navigate("/dashboard", { replace: true });
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Login failed";

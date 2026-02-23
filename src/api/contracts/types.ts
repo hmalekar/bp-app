@@ -31,8 +31,16 @@ export interface PendingSalesMisRecordDto {
   BorrowerCode: string;
   BorrowerName: string;
   LastSubmittedMonth: number;
+  LastMisMonth: string;
   NewDueMonth: number;
   NewDueMonthV: string;
+  IsDueMisUploaded: boolean;
+  LatestWorkflowUser: string;
+  LatestWorkflowStatus: string;
+  LatestWorkflowComments: string;
+  LatestWorkflowUserRole: string;
+  NextApprovalUserRole: string;
+  IsMisApproved: boolean;
 }
 
 export interface SalesMisRecordDto {
@@ -112,6 +120,7 @@ export interface ImportSalesMisRequest {
   ProjectNumber: number;
   YearMonth: number;
   PreviousYearMonth: number;
+  Errors: SalesMisRowError[];
 }
 
 export interface SalesMisRowError {
@@ -132,10 +141,67 @@ export interface SalesMisRowError {
   CarpetArea: number;
   CarpetAreaRera: number;
   ValidationErrors: string;
+  ValidationWarnings: string;
+  Commentary: string;
 }
 
 export interface SalesMisImportResult {
   Success: boolean;
   ImportedCount: number;
   Errors: SalesMisRowError[];
+}
+
+export interface SalesMisWorkflowUpdateRequest {
+  YearMonth: number;
+  ProjectNumber: number;
+  WorkflowStatus: string;
+  Comments: string;
+}
+
+export interface ValidationResponse {
+  IsValid: boolean;
+  Message: string;
+}
+
+export interface UnitWarningDto {
+  UnitNumber: string;
+  UnitUniqueNumber: number;
+  Warnings: string;
+  Commentary: string;
+  HasCommentary: boolean;
+}
+export interface UnitAnomalyDto {
+  UnitNumber: string;
+  UnitUniqueNumber: number;
+  ChangedFields: string[];
+}
+export interface UnitAmountChangeDto {
+  UnitNumber: string;
+  UnitUniqueNumber: number;
+  PreviousDemand: number;
+  CurrentDemand: number;
+  DemandDifference: number;
+  PreviousReceived: number;
+  CurrentReceived: number;
+  ReceivedDifference: number;
+}
+export interface SalesMisComparisonResultDto {
+  UnitsSoldThisMonth: number;
+  UnitsCancelledThisMonth: number;
+  DemandRaisedThisMonth: number;
+  DemandIncrease: number;
+  DemandDecrease: number;
+  ReceivedThisMonth: number;
+  CollectionIncrease: number;
+  CollectionDecrease: number;
+  SalesValueIncrease: number;
+  SalesValueDecrease: number;
+  NewlySoldUnits: SalesMisRecordDto[];
+  CancelledUnits: SalesMisRecordDto[];
+  AmountChanges: UnitAmountChangeDto[];
+  Anomalies: UnitAnomalyDto[];
+  CurrentWarnings: UnitWarningDto[];
+  TotalUnitsWithWarnings: number;
+  TotalUnitsWithWarningsWithoutCommentary: number;
+  TotalUnitsWithWarningsWithCommentary: number;
 }

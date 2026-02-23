@@ -10,6 +10,7 @@ import PendingMisGridEditPage from "./pages/PendingMisGridEditPage";
 import PendingMisExcelGridPage from "./pages/PendingMisExcelGridPage";
 import PendingMisTableDrawerPage from "./pages/PendingMisTableDrawerPage";
 import UploadSalesMisPage from "./pages/UploadSalesMisPage";
+import ReviewSalesMisPage from "./pages/ReviewSalesMisPage";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Route path="pending-mis-grid" element={<PendingMisGridEditPage />} />
         <Route path="pending-mis-excel" element={<PendingMisExcelGridPage />} />
         <Route path="upload-sales-mis" element={<UploadSalesMisPage />} />
+        <Route path="review-sales-mis" element={<ReviewSalesMisPage />} />
       </Route>
       <Route element={<AuthLayout />}>
         <Route path="login" element={<LoginPage />} />
