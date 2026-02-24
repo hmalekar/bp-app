@@ -223,3 +223,49 @@ export interface SalesMisComparisonResultDto {
   UnitsWithWarnings: UnitWarningDto[];
   TotalUnitsWithWarnings: number;
 }
+export interface SalesCancellationRecordDto {
+  YearMonth: number;
+  ProjectNumber: number;
+  AssetNumber: number;
+  AssetName: string;
+  Phase: string;
+  Building: string;
+  Floor: string;
+  UnitNumber: string;
+  UnitConfiguration: string;
+  UnitTypeCode: string;
+  SaleableArea: number;
+  CarpetArea: number;
+  CarpetAreaRera: number;
+  UnitUniqueNumber: number;
+  BookingDate: string;
+  SalesBasePrice: number;
+  TotalAmountReceived: number;
+  CancellationCharges: number;
+  RefundableAmount: number;
+  AmountRefunded: number;
+  ReasonForCancellation: string;
+  Remarks: string;
+}
+export interface SalesCancellationRequest {
+  ProjectNumber: number;
+  YearMonth: number;
+  CancelledUnits: SalesCancellationRecordDto[];
+}
+export interface SoldUnitRecordDto {
+  AssetNumber: number;
+  AssetName: string;
+  Phase: string;
+  Building: string;
+  Floor: string;
+  UnitNumber: string;
+  UnitConfiguration: string;
+  UnitTypeCode: string;
+  SaleableArea: number;
+  CarpetArea: number;
+  CarpetAreaRera: number;
+  UnitUniqueNumber: number;
+  BookingDate: string;
+  SalesBasePrice: number;
+  TotalAmountReceived: number;
+}

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { downloadFile, apiPost } from "../api/client";
+import { downloadFile, apiPost, apiGet } from "../api/client";
 import { API_ENDPOINTS } from "../api/contracts/endpoints";
 import { SALES_MIS_WORKFLOW_STATUS, getSalesMisStatusBadgeClass } from "../constants/salesMisWorkflowStatus";
+import SearchableDropdown, { type SearchableDropdownOption } from "../components/SearchableDropdown";
 import type {
   PendingSalesMisRecordDto,
   SalesMisRequestPayload,
@@ -11,9 +12,133 @@ import type {
   ImportSalesMisRequest,
   SalesMisWorkflowUpdateRequest,
   ValidationResponse,
+  SoldUnitRecordDto,
+  SalesCancellationRecordDto,
+  SalesCancellationRequest,
 } from "../api/contracts/types";
 
 const formatMonthLabel = (record: PendingSalesMisRecordDto) => record.NewDueMonthV ?? `${record.NewDueMonth}`;
+
+/** Single cancellation row (unit + user-entered fields). */
+interface CancellationRowState {
+  id: number;
+  selectedUnit: SoldUnitRecordDto | null;
+  CancellationCharges: number;
+  RefundableAmount: number;
+  AmountRefunded: number;
+  ReasonForCancellation: string;
+  Remarks: string;
+}
+
+/** Per-field validation errors for a cancellation row. */
+interface CancellationRowErrors {
+  unitDuplicate?: string;
+  cancellationCharges?: string;
+  refundableAmount?: string;
+  amountRefunded?: string;
+  reasonForCancellation?: string;
+}
+
+function getCancellationRowErrors(row: CancellationRowState, rowIndex: number, allRows: CancellationRowState[]): CancellationRowErrors {
+  const errors: CancellationRowErrors = {};
+  const basePrice = row.selectedUnit?.SalesBasePrice ?? 0;
+
+  if (row.selectedUnit) {
+    const sameUnitInOtherRow = allRows.some((r, i) => i !== rowIndex && r.selectedUnit?.UnitUniqueNumber === row.selectedUnit?.UnitUniqueNumber);
+    if (sameUnitInOtherRow) {
+      errors.unitDuplicate = "This unit is already selected in another row.";
+    }
+  }
+
+  if (row.selectedUnit) {
+    if (row.CancellationCharges < 0) {
+      errors.cancellationCharges = "Cannot be less than 0.";
+    } else if (row.CancellationCharges > basePrice) {
+      errors.cancellationCharges = "Cannot exceed sales base price.";
+    }
+
+    if (row.RefundableAmount < 0) {
+      errors.refundableAmount = "Cannot be less than 0.";
+    } else if (row.RefundableAmount > basePrice) {
+      errors.refundableAmount = "Cannot exceed sales base price.";
+    }
+
+    if (row.AmountRefunded < 0) {
+      errors.amountRefunded = "Cannot be less than 0.";
+    } else if (row.AmountRefunded > row.RefundableAmount) {
+      errors.amountRefunded = "Cannot exceed refundable amount.";
+    }
+  }
+
+  if (row.selectedUnit && !row.ReasonForCancellation?.trim()) {
+    errors.reasonForCancellation = "Reason for cancellation is required.";
+  }
+
+  return errors;
+}
+
+function buildCancellationDto(row: CancellationRowState, yearMonth: number, projectNumber: number): SalesCancellationRecordDto | null {
+  if (!row.selectedUnit) return null;
+  const u = row.selectedUnit;
+  return {
+    YearMonth: yearMonth,
+    ProjectNumber: projectNumber,
+    AssetNumber: u.AssetNumber,
+    AssetName: u.AssetName,
+    Phase: u.Phase,
+    Building: u.Building,
+    Floor: u.Floor,
+    UnitNumber: u.UnitNumber,
+    UnitConfiguration: u.UnitConfiguration,
+    UnitTypeCode: u.UnitTypeCode,
+    SaleableArea: u.SaleableArea,
+    CarpetArea: u.CarpetArea,
+    CarpetAreaRera: u.CarpetAreaRera,
+    UnitUniqueNumber: u.UnitUniqueNumber,
+    BookingDate: u.BookingDate,
+    SalesBasePrice: u.SalesBasePrice,
+    TotalAmountReceived: u.TotalAmountReceived,
+    CancellationCharges: row.CancellationCharges,
+    RefundableAmount: row.RefundableAmount,
+    AmountRefunded: row.AmountRefunded,
+    ReasonForCancellation: row.ReasonForCancellation,
+    Remarks: row.Remarks,
+  };
+}
+
+/** Convert cancelled-unit DTO to SoldUnitRecordDto for dropdown. */
+function cancellationDtoToSoldUnit(dto: SalesCancellationRecordDto): SoldUnitRecordDto {
+  return {
+    AssetNumber: dto.AssetNumber,
+    AssetName: dto.AssetName,
+    Phase: dto.Phase,
+    Building: dto.Building,
+    Floor: dto.Floor,
+    UnitNumber: dto.UnitNumber,
+    UnitConfiguration: dto.UnitConfiguration,
+    UnitTypeCode: dto.UnitTypeCode,
+    SaleableArea: dto.SaleableArea,
+    CarpetArea: dto.CarpetArea,
+    CarpetAreaRera: dto.CarpetAreaRera,
+    UnitUniqueNumber: dto.UnitUniqueNumber,
+    BookingDate: dto.BookingDate,
+    SalesBasePrice: dto.SalesBasePrice,
+    TotalAmountReceived: dto.TotalAmountReceived,
+  };
+}
+
+/** Convert SalesCancellationRecordDto to CancellationRowState. */
+function cancellationDtoToRowState(dto: SalesCancellationRecordDto, id: number): CancellationRowState {
+  return {
+    id,
+    selectedUnit: cancellationDtoToSoldUnit(dto),
+    CancellationCharges: dto.CancellationCharges,
+    RefundableAmount: dto.RefundableAmount,
+    AmountRefunded: dto.AmountRefunded,
+    ReasonForCancellation: dto.ReasonForCancellation,
+    Remarks: dto.Remarks,
+  };
+}
 
 /** Extract error message from caught error; prefer ValidationResponse.Message from API if present. */
 function getWorkflowErrorMessage(caught: unknown, fallback: string): string {
@@ -57,6 +182,16 @@ function UploadSalesMisPage() {
   const [isRecalling, setIsRecalling] = useState(false);
   const [importResult, setImportResult] = useState<SalesMisImportResult | null>(null);
 
+  // Cancellation section: sold units (fetched on first "Add" click) and rows
+  const [soldUnits, setSoldUnits] = useState<SoldUnitRecordDto[] | null>(null);
+  const [soldUnitsLoading, setSoldUnitsLoading] = useState(false);
+  const [soldUnitsError, setSoldUnitsError] = useState<string | null>(null);
+  const [cancellationRows, setCancellationRows] = useState<CancellationRowState[]>([]);
+  const [nextRowId, setNextRowId] = useState(1);
+  const [isSubmittingCancellation, setIsSubmittingCancellation] = useState(false);
+  const [cancelledUnitsLoading, setCancelledUnitsLoading] = useState(false);
+  const [cancelledUnitsLoadError, setCancelledUnitsLoadError] = useState<string | null>(null);
+
   const currentStatus = record?.LatestWorkflowStatus?.trim() || "Pending Upload";
   const isPendingUpload = currentStatus === "Pending Upload";
   const isSubmittedForApproval = currentStatus === "Submitted for Approval";
@@ -74,6 +209,125 @@ function UploadSalesMisPage() {
   const showRecallButton = !isApproved && !isRejected;
 
   const displayRecord = record ?? resolvedRecord;
+
+  // Load cancelled units when page is available and section is unlocked (same rules as upload)
+  useEffect(() => {
+    if (!displayRecord || !isUploadEnabled) return;
+    let cancelled = false;
+    setCancelledUnitsLoadError(null);
+    setCancelledUnitsLoading(true);
+    apiGet<SalesCancellationRecordDto[]>(API_ENDPOINTS.SALES_CANCELLED_UNITS, {
+      params: { YearMonth: displayRecord.NewDueMonth, ProjectNumber: displayRecord.ProjectNumber },
+    })
+      .then((list) => {
+        if (cancelled) return;
+        const dtos = Array.isArray(list) ? list : [];
+        const rows: CancellationRowState[] = dtos.map((dto, i) => cancellationDtoToRowState(dto, i + 1));
+        const units: SoldUnitRecordDto[] = dtos.map(cancellationDtoToSoldUnit);
+        setCancellationRows(rows);
+        setNextRowId(dtos.length + 1);
+        if (units.length > 0) setSoldUnits(units);
+      })
+      .catch((err) => {
+        if (!cancelled) setCancelledUnitsLoadError(err instanceof Error ? err.message : "Failed to load cancelled units");
+      })
+      .finally(() => {
+        if (!cancelled) setCancelledUnitsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [displayRecord?.ProjectNumber, displayRecord?.NewDueMonth, isUploadEnabled]);
+
+  const handleAddCancellationRow = async () => {
+    if (!displayRecord) return;
+    setSoldUnitsError(null);
+    if (soldUnits === null) {
+      setSoldUnitsLoading(true);
+      try {
+        const yearMonth = displayRecord.NewDueMonth;
+        const projectNumber = displayRecord.ProjectNumber;
+        const list = await apiGet<SoldUnitRecordDto[]>(API_ENDPOINTS.SALES_SOLD_UNITS, {
+          params: { YearMonth: yearMonth, ProjectNumber: projectNumber },
+        });
+        setSoldUnits(Array.isArray(list) ? list : []);
+      } catch (caught) {
+        setSoldUnitsError(caught instanceof Error ? caught.message : "Failed to load sold units");
+        return;
+      } finally {
+        setSoldUnitsLoading(false);
+      }
+    }
+    setCancellationRows((prev) => [
+      ...prev,
+      {
+        id: nextRowId,
+        selectedUnit: null,
+        CancellationCharges: 0,
+        RefundableAmount: 0,
+        AmountRefunded: 0,
+        ReasonForCancellation: "",
+        Remarks: "",
+      },
+    ]);
+    setNextRowId((id) => id + 1);
+  };
+
+  const updateCancellationRow = (id: number, updates: Partial<CancellationRowState>) => {
+    setCancellationRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)));
+  };
+
+  const removeCancellationRow = (id: number) => {
+    setCancellationRows((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const soldUnitOptions: SearchableDropdownOption<SoldUnitRecordDto>[] = (soldUnits ?? []).map((u) => ({
+    value: u,
+    label: `${u.AssetName} – ${u.UnitNumber}`.trim(),
+  }));
+
+  const cancellationRowErrors = useMemo(
+    () => cancellationRows.map((row, i) => getCancellationRowErrors(row, i, cancellationRows)),
+    [cancellationRows],
+  );
+
+  const hasCancellationRowErrors = cancellationRowErrors.some(
+    (e) => e.unitDuplicate ?? e.cancellationCharges ?? e.refundableAmount ?? e.amountRefunded ?? e.reasonForCancellation,
+  );
+
+  const completedCancellations: SalesCancellationRecordDto[] = useMemo(() => {
+    if (!displayRecord) return [];
+    return cancellationRows
+      .filter((row, i) => {
+        const err = cancellationRowErrors[i];
+        const hasError = err.unitDuplicate ?? err.cancellationCharges ?? err.refundableAmount ?? err.amountRefunded ?? err.reasonForCancellation;
+        return !hasError && row.selectedUnit != null;
+      })
+      .map((row) => buildCancellationDto(row, displayRecord.NewDueMonth, displayRecord.ProjectNumber))
+      .filter((dto): dto is SalesCancellationRecordDto => dto != null);
+  }, [displayRecord, cancellationRows, cancellationRowErrors]);
+
+  const handleUpdateCancellation = async () => {
+    if (!displayRecord || completedCancellations.length === 0) return;
+    setError(null);
+    setSuccessMessage(null);
+    setIsSubmittingCancellation(true);
+    try {
+      const request: SalesCancellationRequest = {
+        ProjectNumber: displayRecord.ProjectNumber,
+        YearMonth: displayRecord.NewDueMonth,
+        CancelledUnits: completedCancellations,
+      };
+      await apiPost<void, SalesCancellationRequest>(API_ENDPOINTS.SALES_CANCELLATION, request);
+      setSuccessMessage("Cancellations updated successfully.");
+      setError(null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Failed to update cancellations");
+      setSuccessMessage(null);
+    } finally {
+      setIsSubmittingCancellation(false);
+    }
+  };
 
   const handleDownload = async () => {
     if (!displayRecord) return;
@@ -279,11 +533,29 @@ function UploadSalesMisPage() {
 
   return (
     <div className="d-flex flex-column gap-4">
-      <div>
+      {/* Sub-header: back link left, Recall + Submit right */}
+      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
         <button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => navigate("/dashboard")}>
           ← Back to dashboard
         </button>
+        <div className="d-flex gap-2">
+          {showRecallButton && (
+            <button type="button" className="btn btn-warning btn-sm" onClick={handleRecall} disabled={isRecalling || isPendingUpload}>
+              {isRecalling ? "Recalling..." : "Recall"}
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-success btn-sm"
+            onClick={handleSubmitForApproval}
+            disabled={isSubmittedForApproval || isSubmitting || isPendingUpload}
+          >
+            {isSubmitting ? "Submitting..." : "Submit for Approval"}
+          </button>
+        </div>
       </div>
+
+      {/* Page title card – Upload Sales MIS with project details and status */}
       <div className="card shadow-sm border-0">
         <div className="card-body">
           <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
@@ -310,41 +582,200 @@ function UploadSalesMisPage() {
       </div>
 
       {successMessage && (
-        <div className="alert alert-success" role="alert">
+        <div className="alert alert-success mb-0" role="alert">
           {successMessage}
         </div>
       )}
 
+      {/* Report cancellations */}
       <div className="card shadow-sm border-0">
         <div className="card-body">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <p className="mb-0">Download the MIS Excel for the selected project and month, then upload it back once reviewed.</p>
-            <div className="d-flex gap-2">
-              {showRecallButton && (
-                <button type="button" className="btn btn-warning" onClick={handleRecall} disabled={isRecalling || isPendingUpload}>
-                  {isRecalling ? "Recalling..." : "Recall"}
-                </button>
-              )}
-              <button
-                type="button"
-                className="btn btn-success"
-                onClick={handleSubmitForApproval}
-                disabled={isSubmittedForApproval || isSubmitting || isPendingUpload}
-              >
-                {isSubmitting ? "Submitting..." : "Submit for Approval"}
-              </button>
+          <h3 className="h6 mb-3">Report cancellations</h3>
+          {!isUploadEnabled && (
+            <div className="alert alert-info mb-3">
+              Cancellations are disabled. Current status: <strong>{currentStatus}</strong>
             </div>
+          )}
+          {cancelledUnitsLoadError && <div className="alert alert-danger mb-3">{cancelledUnitsLoadError}</div>}
+          {cancelledUnitsLoading && <div className="text-muted small mb-3">Loading cancelled units…</div>}
+          {soldUnitsError && <div className="alert alert-danger mb-3">{soldUnitsError}</div>}
+          {hasCancellationRowErrors && (
+            <div className="alert alert-warning mb-3">
+              Some rows have validation errors. Please correct them before submitting. Only rows without errors will be included.
+            </div>
+          )}
+          <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <button
+              type="button"
+              className="btn btn-outline-primary btn-sm"
+              onClick={handleAddCancellationRow}
+              disabled={soldUnitsLoading || cancelledUnitsLoading || !isUploadEnabled}
+            >
+              {soldUnitsLoading ? "Loading sold units..." : "Add cancellation row"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={handleUpdateCancellation}
+              disabled={completedCancellations.length === 0 || isSubmittingCancellation || !isUploadEnabled}
+            >
+              {isSubmittingCancellation ? "Updating..." : "Update cancellation"}
+            </button>
           </div>
-          {error ? <div className="alert alert-danger">{error}</div> : null}
-          <button className="btn btn-primary" onClick={handleDownload} disabled={isDownloading}>
-            {isDownloading ? "Downloading..." : "Download MIS Excel"}
-          </button>
+          {cancellationRows.length > 0 && (
+            <div className="table-responsive">
+              <table className="table table-sm table-bordered">
+                <thead className="table-light">
+                  <tr>
+                    <th>Unit</th>
+                    <th>Total amount received</th>
+                    <th>Sales base price</th>
+                    <th>Cancellation charges</th>
+                    <th>Refundable amount</th>
+                    <th>Amount refunded</th>
+                    <th>Reason for cancellation</th>
+                    <th>Remarks</th>
+                    <th style={{ width: 40 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cancellationRows.map((row, rowIndex) => {
+                    const errors = cancellationRowErrors[rowIndex] ?? {};
+                    return (
+                      <tr key={row.id}>
+                        <td style={{ minWidth: 200 }}>
+                          <div>
+                            <SearchableDropdown<SoldUnitRecordDto>
+                              options={soldUnitOptions}
+                              value={row.selectedUnit}
+                              onChange={(unit) => updateCancellationRow(row.id, { selectedUnit: unit })}
+                              placeholder="Search asset + unit..."
+                              getOptionKey={(u) => u.UnitUniqueNumber}
+                              invalid={Boolean(errors.unitDuplicate)}
+                            />
+                            {errors.unitDuplicate && <div className="invalid-feedback d-block">{errors.unitDuplicate}</div>}
+                          </div>
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            className="form-control form-control-sm bg-light"
+                            readOnly
+                            value={row.selectedUnit != null ? row.selectedUnit.TotalAmountReceived : ""}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            className="form-control form-control-sm bg-light"
+                            readOnly
+                            value={row.selectedUnit != null ? row.selectedUnit.SalesBasePrice : ""}
+                          />
+                        </td>
+                        <td>
+                          <div>
+                            <input
+                              type="number"
+                              className={`form-control form-control-sm ${errors.cancellationCharges ? "is-invalid" : ""}`}
+                              value={row.CancellationCharges || ""}
+                              onChange={(e) =>
+                                updateCancellationRow(row.id, {
+                                  CancellationCharges: e.target.value === "" ? 0 : Number(e.target.value),
+                                })
+                              }
+                              placeholder="0"
+                            />
+                            {errors.cancellationCharges && <div className="invalid-feedback d-block">{errors.cancellationCharges}</div>}
+                          </div>
+                        </td>
+                        <td>
+                          <div>
+                            <input
+                              type="number"
+                              className={`form-control form-control-sm ${errors.refundableAmount ? "is-invalid" : ""}`}
+                              value={row.RefundableAmount || ""}
+                              onChange={(e) =>
+                                updateCancellationRow(row.id, {
+                                  RefundableAmount: e.target.value === "" ? 0 : Number(e.target.value),
+                                })
+                              }
+                              placeholder="0"
+                            />
+                            {errors.refundableAmount && <div className="invalid-feedback d-block">{errors.refundableAmount}</div>}
+                          </div>
+                        </td>
+                        <td>
+                          <div>
+                            <input
+                              type="number"
+                              className={`form-control form-control-sm ${errors.amountRefunded ? "is-invalid" : ""}`}
+                              value={row.AmountRefunded || ""}
+                              onChange={(e) =>
+                                updateCancellationRow(row.id, {
+                                  AmountRefunded: e.target.value === "" ? 0 : Number(e.target.value),
+                                })
+                              }
+                              placeholder="0"
+                            />
+                            {errors.amountRefunded && <div className="invalid-feedback d-block">{errors.amountRefunded}</div>}
+                          </div>
+                        </td>
+                        <td>
+                          <div>
+                            <input
+                              type="text"
+                              className={`form-control form-control-sm ${errors.reasonForCancellation ? "is-invalid" : ""}`}
+                              value={row.ReasonForCancellation}
+                              onChange={(e) => updateCancellationRow(row.id, { ReasonForCancellation: e.target.value })}
+                              placeholder="Reason (required)"
+                            />
+                            {errors.reasonForCancellation && <div className="invalid-feedback d-block">{errors.reasonForCancellation}</div>}
+                          </div>
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            value={row.Remarks}
+                            onChange={(e) => updateCancellationRow(row.id, { Remarks: e.target.value })}
+                            placeholder="Remarks"
+                          />
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-outline-danger btn-sm py-0 px-1"
+                            onClick={() => removeCancellationRow(row.id)}
+                            aria-label="Remove row"
+                          >
+                            ×
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {completedCancellations.length > 0 && <div className="mt-2 small text-muted">{completedCancellations.length} cancellation(s) ready.</div>}
         </div>
       </div>
 
+      {/* Upload card: Download MIS Excel + file upload */}
       <div className="card shadow-sm border-0">
         <div className="card-body">
           <h3 className="h6 mb-3">Upload Updated Sales MIS</h3>
+          <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <button type="button" className="btn btn-primary" onClick={handleDownload} disabled={isDownloading}>
+              {isDownloading ? "Downloading..." : "Download MIS Excel"}
+            </button>
+            <span className="text-muted small">
+              Download the MIS Excel, then upload it back once reviewed. If MIS has been updated for the current month. This will download the latest
+              MIS Excel.
+            </span>
+          </div>
+          {error ? <div className="alert alert-danger mb-3">{error}</div> : null}
           {!isUploadEnabled && (
             <div className="alert alert-info mb-3">
               Upload is disabled. Current status: <strong>{currentStatus}</strong>

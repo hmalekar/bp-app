@@ -9,6 +9,9 @@ export const API_ENDPOINTS = {
   SALES_MIS_UPDATE_COMMENTARY: "/api/v1/sales/mis_update_commentary",
   SALES_MIS_WORKFLOW_UPDATE: "/api/v1/sales/mis_workflow_update",
   SALES_MIS_COMPARE: "/api/v1/sales/mis_compare",
+  SALES_SOLD_UNITS: "/api/v1/sales/mis_sold_units",
+  SALES_CANCELLATION: "/api/v1/sales/sales_cancellation",
+  SALES_CANCELLED_UNITS: "/api/v1/sales/cancelled_units",
 } as const;
 
 export type ApiEndpointGroup = keyof typeof API_ENDPOINTS;
