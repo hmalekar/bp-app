@@ -10,6 +10,7 @@ const PATH_PAGE_NAMES: Record<string, string> = {
   "/pending-mis-excel": "Pending MIS Excel",
   "/upload-sales-mis": "Upload Sales MIS",
   "/review-sales-mis": "Review Sales MIS",
+  "/manage-disbursement-request": "Manage Disbursement Request",
 };
 
 function RootLayout() {
@@ -33,11 +34,7 @@ function RootLayout() {
           <NavLink className="navbar-brand" to="/">
             Borrower Portal
           </NavLink>
-          {pageName ? (
-            <span className="navbar-text text-light text-opacity-90 d-none d-md-inline">
-              {pageName}
-            </span>
-          ) : null}
+          {pageName ? <span className="navbar-text text-light text-opacity-90 d-none d-md-inline">{pageName}</span> : null}
           <button
             className="navbar-toggler"
             type="button"

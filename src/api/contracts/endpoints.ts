@@ -12,6 +12,13 @@ export const API_ENDPOINTS = {
   SALES_SOLD_UNITS: "/api/v1/sales/mis_sold_units",
   SALES_CANCELLATION: "/api/v1/sales/sales_cancellation",
   SALES_CANCELLED_UNITS: "/api/v1/sales/cancelled_units",
+  COST_PROJECTS: "/api/v1/cost/projects",
+  COST_CATEGORY_MASTER: "/api/v1/cost/category_master",
+  COST_DR_EXPORT_TEMPLATE: "/api/v1/cost/export_template",
+  COST_DR_IMPORT: "/api/v1/cost/dr_import",
+  COST_PENDING_DR: "/api/v1/cost/pending_dr",
+  COST_DR_WORKFLOW_UPDATE: "/api/v1/cost/dr_workflow_update",
+  COST_DR: "/api/v1/cost/dr",
 } as const;
 
 export type ApiEndpointGroup = keyof typeof API_ENDPOINTS;

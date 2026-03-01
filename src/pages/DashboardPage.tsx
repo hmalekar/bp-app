@@ -3,13 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { apiGet } from "../api/client";
 import { getUserRole } from "../api/http";
 import { API_ENDPOINTS } from "../api/contracts/endpoints";
-import type { PendingSalesMisRecordDto } from "../api/contracts/types";
+import type { PendingSalesMisRecordDto, PendingDisbursementRequestDto } from "../api/contracts/types";
 import { getSalesMisStatusBadgeClass } from "../constants/salesMisWorkflowStatus";
 
 function DashboardPage() {
   const [records, setRecords] = useState<PendingSalesMisRecordDto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [pendingDr, setPendingDr] = useState<PendingDisbursementRequestDto[]>([]);
+  const [pendingDrError, setPendingDrError] = useState<string | null>(null);
+  const [pendingDrLoading, setPendingDrLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -35,6 +38,35 @@ function DashboardPage() {
     };
 
     fetchPendingMis();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchPendingDr = async () => {
+      setPendingDrError(null);
+      try {
+        const data = await apiGet<PendingDisbursementRequestDto[]>(API_ENDPOINTS.COST_PENDING_DR);
+        if (isMounted) {
+          setPendingDr(data);
+        }
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : "Failed to load pending disbursement requests";
+        if (isMounted) {
+          setPendingDrError(message);
+        }
+      } finally {
+        if (isMounted) {
+          setPendingDrLoading(false);
+        }
+      }
+    };
+
+    fetchPendingDr();
 
     return () => {
       isMounted = false;
@@ -116,6 +148,73 @@ function DashboardPage() {
           </table>
         </div>
       )}
+
+      {/* Pending Disbursement Requests */}
+      <div className="mt-5">
+        <div className="d-flex align-items-center justify-content-between mb-2">
+          <h2 className="h5 mb-0">Pending Disbursement Requests</h2>
+          {isBorrower ? (
+            <button type="button" className="btn btn-primary" onClick={() => navigate("/manage-disbursement-request")}>
+              Add
+            </button>
+          ) : null}
+        </div>
+
+        {pendingDrError ? <div className="alert alert-danger">{pendingDrError}</div> : null}
+
+        {pendingDrLoading ? (
+          <div className="text-muted">Loading pending disbursement requests...</div>
+        ) : (
+          <div className="table-responsive">
+            <table className="table table-hover align-middle">
+              <thead className="table-light">
+                <tr>
+                  <th scope="col">DR #</th>
+                  <th scope="col">Project</th>
+                  <th scope="col">Borrower</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Last Action By</th>
+                  <th scope="col">Created</th>
+                  <th scope="col">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingDr.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center text-muted py-4">
+                      No pending disbursement requests.
+                    </td>
+                  </tr>
+                ) : (
+                  pendingDr.map((dr) => (
+                    <tr key={dr.DrNumber}>
+                      <td>{dr.DrNumber}</td>
+                      <td>
+                        <div>{dr.ProjectName}</div>
+                        <div className="text-muted small">{dr.ProjectNumber}</div>
+                      </td>
+                      <td>
+                        <div>{dr.BorrowerName}</div>
+                        <div className="text-muted small">{dr.BorrowerCode}</div>
+                      </td>
+                      <td>
+                        <span className={`badge ${getSalesMisStatusBadgeClass(dr.LatestWorkflowStatus)}`}>{dr.LatestWorkflowStatus || "—"}</span>
+                      </td>
+                      <td>{dr.LatestWorkflowUser?.trim() ? `${dr.LatestWorkflowUser.trim()} (${dr.LatestWorkflowUserRole?.trim() || "—"})` : "—"}</td>
+                      <td>{dr.CreatedDate || "—"}</td>
+                      <td>
+                        <button type="button" className="btn btn-sm btn-primary">
+                          Action
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

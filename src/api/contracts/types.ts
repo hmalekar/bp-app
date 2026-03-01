@@ -269,3 +269,79 @@ export interface SoldUnitRecordDto {
   SalesBasePrice: number;
   TotalAmountReceived: number;
 }
+export interface ProjectRecordDto {
+  ProjectNumber: number;
+  ProjectName: string;
+}
+export interface CostCategoryMasterDto {
+  Category: string;
+  SubCategory: string;
+  IsPartyAdditionalDataRequired: boolean;
+  SkipGstPanValidation: boolean;
+  SkipDocumentValidation: boolean;
+  IsDebentureCost: boolean;
+}
+export interface DisbursementRequestCostRecordDto {
+  RecordNumber: number;
+  AssetNumber: number;
+  Phase: string;
+  Building: string;
+  Category: string;
+  SubCategory: string;
+  PartyName: string;
+  PartyGSTN: string;
+  PartyPAN: string;
+  PartyEmail: string;
+  PartyMobile: string;
+  CostReason: string;
+  PoWoNumber: string;
+  TotalOrderAmount: number;
+  DocumentType: string;
+  DocumentNumber: string;
+  DocumentDate: string | null;
+  PayableDays: number;
+  DocumentAmount: number;
+  GstAmount: number;
+  TotalAmount: number;
+  TdsAmount: number;
+  AdvanceAdjustedAmount: number;
+  RetentionAmount: number;
+  AnyOtherDeductions: number;
+  PayableAmount: number;
+  ApprovedAmount: number;
+  OutstandingAmount: number;
+  Status: string;
+  ValidationErrors: string;
+  AuditRemarks: string;
+}
+export interface DisbursementRequestImportResult extends ValidationResponse {
+  DisbursementRequestNumber: number;
+  Records: DisbursementRequestCostRecordDto[];
+}
+export interface PendingDisbursementRequestDto {
+  DrNumber: number;
+  ProjectNumber: number;
+  ProjectName: string;
+  BorrowerCode: string;
+  BorrowerName: string;
+  LatestWorkflowUser: string;
+  LatestWorkflowStatus: string;
+  LatestWorkflowComments: string;
+  LatestWorkflowUserRole: string;
+  NextApprovalUserRole: string;
+  Remarks: string;
+  CreatedDate: string;
+}
+export interface DisbursementRequestWorkflowUpdateRequest {
+  DrNumber: number;
+  WorkflowStatus: string;
+  Comments: string;
+}
+export interface DisbursementRequestDto {
+  Number: number;
+  ProjectNumber: number;
+  YearMonth: number;
+  Remarks: string;
+  ApprovalFlag: string;
+  Records: DisbursementRequestCostRecordDto[];
+}
