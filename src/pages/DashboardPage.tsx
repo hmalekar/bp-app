@@ -154,7 +154,7 @@ function DashboardPage() {
         <div className="d-flex align-items-center justify-content-between mb-2">
           <h2 className="h5 mb-0">Pending Disbursement Requests</h2>
           {isBorrower ? (
-            <button type="button" className="btn btn-primary" onClick={() => navigate("/manage-disbursement-request")}>
+            <button type="button" className="btn btn-primary" onClick={() => navigate("/add-disbursement-request")}>
               Add
             </button>
           ) : null}
@@ -203,9 +203,21 @@ function DashboardPage() {
                       <td>{dr.LatestWorkflowUser?.trim() ? `${dr.LatestWorkflowUser.trim()} (${dr.LatestWorkflowUserRole?.trim() || "—"})` : "—"}</td>
                       <td>{dr.CreatedDate || "—"}</td>
                       <td>
-                        <button type="button" className="btn btn-sm btn-primary">
-                          Action
-                        </button>
+                        {isBorrower ? (
+                          <span className="text-muted">—</span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            onClick={() =>
+                            navigate(`/manage-disbursement-request/${dr.DrNumber}`, {
+                              state: { nextApprovalUserRole: dr.NextApprovalUserRole },
+                            })
+                          }
+                          >
+                            Action
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))

@@ -1,107 +1,132 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { apiGet, apiPost, downloadFile } from "../api/client";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { apiGet, apiPost } from "../api/client";
+import { getUserRole } from "../api/http";
 import { API_ENDPOINTS } from "../api/contracts/endpoints";
-import type { DisbursementRequestCostRecordDto, DisbursementRequestImportResult, ProjectRecordDto } from "../api/contracts/types";
+import { SALES_MIS_WORKFLOW_STATUS } from "../constants/salesMisWorkflowStatus";
+import type {
+  DisbursementRequestCostRecordDto,
+  DisbursementRequestDto,
+  DisbursementRequestWorkflowUpdateRequest,
+  ValidationResponse,
+} from "../api/contracts/types";
 
 function ManageDisbursementRequestPage() {
+  const { drNumber: drNumberParam } = useParams<"drNumber">();
+  const location = useLocation();
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [projects, setProjects] = useState<ProjectRecordDto[]>([]);
-  const [selectedProjectNumber, setSelectedProjectNumber] = useState<number | "">("");
-  const [projectsLoading, setProjectsLoading] = useState(true);
-  const [projectsError, setProjectsError] = useState<string | null>(null);
-  const [templateDownloading, setTemplateDownloading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [remarks, setRemarks] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [importResult, setImportResult] = useState<DisbursementRequestImportResult | null>(null);
+  const nextApprovalUserRole = (location.state as { nextApprovalUserRole?: string } | null)?.nextApprovalUserRole;
+  const [dr, setDr] = useState<DisbursementRequestDto | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isApproving, setIsApproving] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [rejectComments, setRejectComments] = useState("");
+
+  const role = getUserRole();
+  const isBorrower = role === "B";
 
   useEffect(() => {
-    let isMounted = true;
+    if (isBorrower) {
+      navigate("/dashboard", { replace: true });
+      return;
+    }
+  }, [isBorrower, navigate]);
 
-    const fetchProjects = async () => {
-      setProjectsError(null);
+  useEffect(() => {
+    if (isBorrower || drNumberParam == null) return;
+
+    let isMounted = true;
+    const drNumber = Number(drNumberParam);
+    if (Number.isNaN(drNumber)) {
+      setError("Invalid DR number");
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchDr = async () => {
+      setError(null);
+      setDr(null);
       try {
-        const data = await apiGet<ProjectRecordDto[]>(API_ENDPOINTS.COST_PROJECTS);
-        if (isMounted) {
-          setProjects(data ?? []);
-        }
+        const data = await apiGet<DisbursementRequestDto>(API_ENDPOINTS.COST_DR, {
+          params: { drNumber },
+        });
+        if (isMounted) setDr(data);
       } catch (caught) {
-        const message = caught instanceof Error ? caught.message : "Failed to load projects";
-        if (isMounted) setProjectsError(message);
+        const message = caught instanceof Error ? caught.message : "Failed to load disbursement request";
+        if (isMounted) setError(message);
       } finally {
-        if (isMounted) setProjectsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
 
-    fetchProjects();
+    fetchDr();
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [drNumberParam, isBorrower]);
 
-  // When projects load and we have exactly one, select it (initial state may be before first set)
-  useEffect(() => {
-    if (projects.length === 1 && selectedProjectNumber === "") {
-      setSelectedProjectNumber(projects[0].ProjectNumber);
-    } else if (projects.length > 1 && selectedProjectNumber === "" && projects[0]) {
-      setSelectedProjectNumber(projects[0].ProjectNumber);
-    }
-  }, [projects]);
+  const drNumber = drNumberParam != null ? Number(drNumberParam) : null;
 
-  const handleDownloadTemplate = async () => {
-    if (selectedProjectNumber === "") return;
-    setTemplateDownloading(true);
+  const handleApprove = async () => {
+    if (drNumber == null || Number.isNaN(drNumber)) return;
+    setError(null);
+    setIsApproving(true);
     try {
-      await downloadFile(API_ENDPOINTS.COST_DR_EXPORT_TEMPLATE, "disbursement_request_template.xlsx", {
-        params: { projectNumber: selectedProjectNumber },
-      });
-    } catch (caught) {
-      const message = caught instanceof Error ? caught.message : "Failed to download template";
-      alert(message);
-    } finally {
-      setTemplateDownloading(false);
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    setSelectedFile(file ?? null);
-    setUploadError(null);
-    setImportResult(null);
-  };
-
-  const uploadSucceeded = Boolean(importResult && (importResult.IsValid || importResult.DisbursementRequestNumber != null));
-
-  const handleUpload = async () => {
-    if (uploadSucceeded || selectedProjectNumber === "" || !selectedFile) return;
-    setUploadError(null);
-    setImportResult(null);
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      const result = await apiPost<DisbursementRequestImportResult>(API_ENDPOINTS.COST_DR_IMPORT, formData, {
-        params: { projectNumber: selectedProjectNumber, remarks: remarks || undefined },
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
-      setImportResult(result);
+      const payload: DisbursementRequestWorkflowUpdateRequest = {
+        DrNumber: drNumber,
+        WorkflowStatus: SALES_MIS_WORKFLOW_STATUS.APPROVED,
+        Comments: "",
+      };
+      const result = await apiPost<ValidationResponse>(API_ENDPOINTS.COST_DR_WORKFLOW_UPDATE, payload);
       if (result.IsValid) {
-        setSelectedFile(null);
-        setRemarks("");
-        if (fileInputRef.current) fileInputRef.current.value = "";
+        navigate("/dashboard", { replace: true });
+      } else {
+        setError(result.Message ?? "Failed to approve");
       }
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : "Failed to upload disbursement request file";
-      setUploadError(message);
+      setError(caught instanceof Error ? caught.message : "Failed to approve");
     } finally {
-      setUploading(false);
+      setIsApproving(false);
     }
   };
+
+  const handleReject = async () => {
+    if (drNumber == null || Number.isNaN(drNumber)) return;
+    const comments = rejectComments.trim();
+    if (!comments) {
+      setError("Please enter comments for rejection.");
+      return;
+    }
+    setError(null);
+    setIsRejecting(true);
+    try {
+      const payload: DisbursementRequestWorkflowUpdateRequest = {
+        DrNumber: drNumber,
+        WorkflowStatus: SALES_MIS_WORKFLOW_STATUS.REJECTED,
+        Comments: comments,
+      };
+      const result = await apiPost<ValidationResponse>(API_ENDPOINTS.COST_DR_WORKFLOW_UPDATE, payload);
+      if (result.IsValid) {
+        navigate("/dashboard", { replace: true });
+      } else {
+        setError(result.Message ?? "Failed to reject");
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Failed to reject");
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
+  if (isBorrower) return null;
+
+  const formatNumber = (n: number) => (n != null && !Number.isNaN(n) ? n.toLocaleString() : "—");
+  const cell = (v: string | number | null | undefined) => (v != null && String(v).trim() !== "" ? String(v) : "—");
+  const isAlreadyApproved = Boolean(dr?.ApprovalFlag && ["Y", "A"].includes(dr.ApprovalFlag.trim().toUpperCase()));
+  const currentUserRole = (role ?? "").trim();
+  const isNextApprover = nextApprovalUserRole != null && currentUserRole === (nextApprovalUserRole ?? "").trim();
+  const isWorkflowLocked = isAlreadyApproved || !isNextApprover;
 
   return (
     <div>
@@ -112,149 +137,144 @@ function ManageDisbursementRequestPage() {
         </button>
       </div>
 
-      {projectsError ? <div className="alert alert-danger">{projectsError}</div> : null}
+      {error ? <div className="alert alert-danger">{error}</div> : null}
 
-      <div className="card mb-3">
-        <div className="card-body">
-          <h3 className="h6 card-title mb-3">Project &amp; template</h3>
-          {projectsLoading ? (
-            <p className="text-muted mb-0">Loading projects...</p>
-          ) : (
-            <>
-              <div className="mb-3">
-                <label htmlFor="project-select" className="form-label">
-                  Project
-                </label>
-                <select
-                  id="project-select"
-                  className="form-select"
-                  value={selectedProjectNumber}
-                  onChange={(e) => setSelectedProjectNumber(e.target.value === "" ? "" : Number(e.target.value))}
-                >
-                  <option value="">Select a project</option>
-                  {projects.map((p) => (
-                    <option key={p.ProjectNumber} value={p.ProjectNumber}>
-                      {p.ProjectName} ({p.ProjectNumber})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
+      {isLoading ? (
+        <div className="text-muted">Loading disbursement request...</div>
+      ) : dr ? (
+        <>
+          <div className="card mb-3">
+            <div className="card-body py-2">
+              <p className="mb-0 small">
+                <strong>DR #</strong> {cell(dr.Number)}
+                <span className="text-muted mx-2">·</span>
+                <strong>Project</strong> {cell(dr.ProjectNumber)}
+                <span className="text-muted mx-2">·</span>
+                <strong>Year / month</strong> {cell(dr.YearMonth)}
+                <span className="text-muted mx-2">·</span>
+                <strong>Remarks</strong> {cell(dr.Remarks)}
+              </p>
+            </div>
+          </div>
+
+          <div className="card mb-3">
+            <div className="card-header bg-light py-2 d-flex align-items-center">
+              <h3 className="h6 mb-0">Workflow</h3>
+              {isWorkflowLocked && <span className="badge bg-secondary ms-2">Approved</span>}
+            </div>
+            <div className="card-body py-3">
+              <div className="d-flex flex-wrap gap-3 align-items-end">
+                <button type="button" className="btn btn-success" onClick={handleApprove} disabled={isApproving || isRejecting || isWorkflowLocked}>
+                  {isApproving ? "Approving..." : "Approve"}
+                </button>
+                <div className="flex-grow-1" style={{ minWidth: "200px" }}>
+                  <label htmlFor="drRejectComments" className="form-label small text-muted mb-1">
+                    Rejection comments (required to reject)
+                  </label>
+                  <textarea
+                    id="drRejectComments"
+                    className="form-control form-control-sm"
+                    rows={2}
+                    placeholder="Enter comments for rejection..."
+                    value={rejectComments}
+                    onChange={(e) => setRejectComments(e.target.value)}
+                    disabled={isApproving || isRejecting || isWorkflowLocked}
+                  />
+                </div>
                 <button
                   type="button"
-                  className="btn btn-primary"
-                  onClick={handleDownloadTemplate}
-                  disabled={templateDownloading || selectedProjectNumber === ""}
+                  className="btn btn-danger"
+                  onClick={handleReject}
+                  disabled={isApproving || isRejecting || !rejectComments.trim() || isWorkflowLocked}
                 >
-                  {templateDownloading ? "Downloading..." : "Download disbursement request template"}
+                  {isRejecting ? "Rejecting..." : "Reject"}
                 </button>
               </div>
-            </>
-          )}
-        </div>
-      </div>
+            </div>
+          </div>
 
-      <div className="card mb-3">
-        <div className="card-body">
-          <h3 className="h6 card-title mb-3">Upload disbursement request file</h3>
-          {uploadSucceeded && (
-            <div className="alert alert-info mb-3">A disbursement request was created. To create another, go back and open this page again.</div>
-          )}
-          <p className="text-muted small mb-3">Download the template above, fill it in, then upload the completed file here.</p>
-          {uploadError ? <div className="alert alert-danger mb-3">{uploadError}</div> : null}
-          <div className="mb-3">
-            <label htmlFor="dr-file" className="form-label">
-              Select file
-            </label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="form-control"
-              id="dr-file"
-              accept=".xlsx,.xls"
-              onChange={handleFileChange}
-              disabled={uploading || uploadSucceeded || selectedProjectNumber === ""}
-            />
-            {selectedFile && (
-              <div className="form-text mt-1">
-                Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
+          <div className="card mb-3">
+            <div className="card-body">
+              <h3 className="h6 card-title mb-3">Cost lines</h3>
+              <div className="table-responsive">
+                <table className="table table-sm table-bordered table-striped align-middle small">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Row</th>
+                      <th>Building</th>
+                      <th>Category</th>
+                      <th>Sub category</th>
+                      <th>Party name</th>
+                      <th>Party GSTN</th>
+                      <th>Party PAN</th>
+                      <th>Party email</th>
+                      <th>Party mobile</th>
+                      <th>Cost reason</th>
+                      <th>PO / WO #</th>
+                      <th>Total order</th>
+                      <th>Doc type</th>
+                      <th>Doc #</th>
+                      <th>Doc date</th>
+                      <th>Payable days</th>
+                      <th>Document amt</th>
+                      <th>GST amt</th>
+                      <th>Total amt</th>
+                      <th>TDS amt</th>
+                      <th>Advance adj.</th>
+                      <th>Retention</th>
+                      <th>Other ded.</th>
+                      <th>Payable amt</th>
+                      <th>Approved amt</th>
+                      <th>Outstanding</th>
+                      <th>Status</th>
+                      <th>Validation</th>
+                      <th>Audit remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(dr.Records ?? []).map((row: DisbursementRequestCostRecordDto) => (
+                      <tr key={row.RecordNumber}>
+                        <td>{row.RecordNumber}</td>
+                        <td>{cell(row.Building)}</td>
+                        <td>{cell(row.Category)}</td>
+                        <td>{cell(row.SubCategory)}</td>
+                        <td>{cell(row.PartyName)}</td>
+                        <td>{cell(row.PartyGSTN)}</td>
+                        <td>{cell(row.PartyPAN)}</td>
+                        <td>{cell(row.PartyEmail)}</td>
+                        <td>{cell(row.PartyMobile)}</td>
+                        <td>{cell(row.CostReason)}</td>
+                        <td>{cell(row.PoWoNumber)}</td>
+                        <td>{formatNumber(row.TotalOrderAmount)}</td>
+                        <td>{cell(row.DocumentType)}</td>
+                        <td>{cell(row.DocumentNumber)}</td>
+                        <td>{cell(row.DocumentDate)}</td>
+                        <td>{cell(row.PayableDays)}</td>
+                        <td>{formatNumber(row.DocumentAmount)}</td>
+                        <td>{formatNumber(row.GstAmount)}</td>
+                        <td>{formatNumber(row.TotalAmount)}</td>
+                        <td>{formatNumber(row.TdsAmount)}</td>
+                        <td>{formatNumber(row.AdvanceAdjustedAmount)}</td>
+                        <td>{formatNumber(row.RetentionAmount)}</td>
+                        <td>{formatNumber(row.AnyOtherDeductions)}</td>
+                        <td>{formatNumber(row.PayableAmount)}</td>
+                        <td>{formatNumber(row.ApprovedAmount)}</td>
+                        <td>{formatNumber(row.OutstandingAmount)}</td>
+                        <td>{cell(row.Status)}</td>
+                        <td className="text-danger small">{cell(row.ValidationErrors)}</td>
+                        <td className="small">{cell(row.AuditRemarks)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )}
+              {(!dr.Records || dr.Records.length === 0) && <p className="text-muted mb-0">No cost lines.</p>}
+            </div>
           </div>
-          <div className="mb-3">
-            <label htmlFor="dr-remarks" className="form-label">
-              Remarks
-            </label>
-            <textarea
-              id="dr-remarks"
-              className="form-control"
-              rows={3}
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-              disabled={uploading || uploadSucceeded || selectedProjectNumber === ""}
-              placeholder="Optional remarks for this disbursement request"
-            />
-          </div>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={handleUpload}
-            disabled={!selectedFile || uploading || uploadSucceeded || selectedProjectNumber === ""}
-          >
-            {uploading ? "Uploading..." : "Upload disbursement request"}
-          </button>
-        </div>
-      </div>
-
-      {importResult && (
-        <div className="card mb-3">
-          <div className="card-body">
-            <h3 className="h6 card-title mb-3">Import result</h3>
-            {importResult.IsValid || importResult.DisbursementRequestNumber != null ? (
-              <div className="alert alert-success mb-0">
-                {importResult.Message?.trim() ||
-                  `Disbursement request file uploaded successfully. Disbursement request number: ${importResult.DisbursementRequestNumber ?? ""}`.trim()}
-              </div>
-            ) : (
-              <>
-                <div className="alert alert-danger mb-3">{importResult.Message}</div>
-                {importResult.Records && importResult.Records.length > 0 && (
-                  <div className="table-responsive">
-                    <table className="table table-sm table-bordered table-striped">
-                      <thead className="table-dark">
-                        <tr>
-                          <th>Row</th>
-                          <th>Phase</th>
-                          <th>Building</th>
-                          <th>Category</th>
-                          <th>SubCategory</th>
-                          <th>Party Name</th>
-                          <th>Document No.</th>
-                          <th>Validation errors</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {importResult.Records.map((row: DisbursementRequestCostRecordDto) => (
-                          <tr key={row.RecordNumber}>
-                            <td>{row.RecordNumber}</td>
-                            <td>{row.Phase}</td>
-                            <td>{row.Building}</td>
-                            <td>{row.Category}</td>
-                            <td>{row.SubCategory}</td>
-                            <td>{row.PartyName}</td>
-                            <td>{row.DocumentNumber}</td>
-                            <td className="text-danger">{row.ValidationErrors || "—"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
+        </>
+      ) : !error && !isLoading ? (
+        <div className="text-muted">No disbursement request found.</div>
+      ) : null}
     </div>
   );
 }

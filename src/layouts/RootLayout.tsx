@@ -10,6 +10,7 @@ const PATH_PAGE_NAMES: Record<string, string> = {
   "/pending-mis-excel": "Pending MIS Excel",
   "/upload-sales-mis": "Upload Sales MIS",
   "/review-sales-mis": "Review Sales MIS",
+  "/add-disbursement-request": "Add Disbursement Request",
   "/manage-disbursement-request": "Manage Disbursement Request",
 };
 
@@ -18,7 +19,9 @@ function RootLayout() {
   const userRole = getUserRole();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const pageName = PATH_PAGE_NAMES[pathname] ?? "";
+  const pageName =
+    PATH_PAGE_NAMES[pathname] ??
+    (pathname.startsWith("/manage-disbursement-request") ? "Manage Disbursement Request" : "");
 
   const handleLogout = () => {
     clearAuthToken();
