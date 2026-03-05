@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiPost } from "../api/client";
 import { clearAuthToken, clearCurrentUser, clearUserRole, setCurrentUser, setUserRole } from "../api/http";
 import { API_ENDPOINTS } from "../api/contracts/endpoints";
 import type { LoginRequest, LoginResponse } from "../api/contracts/types";
+
+const SESSION_EXPIRED_MESSAGE = "Your session has expired. Please sign in again to continue.";
 
 function LoginPage() {
   const [email, setEmail] = useState("");
@@ -11,6 +13,8 @@ function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isSessionExpired = searchParams.get("session") === "expired";
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -47,6 +51,11 @@ function LoginPage() {
 
         <div className="card shadow-sm border-0">
           <div className="card-body p-4">
+            {isSessionExpired ? (
+              <div className="alert alert-info small py-2 mb-3" role="alert">
+                {SESSION_EXPIRED_MESSAGE}
+              </div>
+            ) : null}
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
                 <label className="form-label" htmlFor="email">

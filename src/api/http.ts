@@ -31,14 +31,34 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
-http.interceptors.response.use((response) => {
-  const headers = AxiosHeaders.from(response.headers as AxiosHeaders | Record<string, string> | undefined);
-  const token = headers.get(AUTH_TOKEN_HEADER);
-  if (typeof token === "string" && token.length > 0) {
-    setAuthToken(token);
+const LOGIN_PATH = "/login";
+const SESSION_EXPIRED_QUERY = "session=expired";
+
+function clearSession() {
+  clearAuthToken();
+  clearUserRole();
+  clearCurrentUser();
+}
+
+http.interceptors.response.use(
+  (response) => {
+    const headers = AxiosHeaders.from(response.headers as AxiosHeaders | Record<string, string> | undefined);
+    const token = headers.get(AUTH_TOKEN_HEADER);
+    if (typeof token === "string" && token.length > 0) {
+      setAuthToken(token);
+    }
+    return response;
+  },
+  (error) => {
+    if (error.response?.status === 401) {
+      clearSession();
+      const loginUrl = `${LOGIN_PATH}?${SESSION_EXPIRED_QUERY}`;
+      window.location.assign(loginUrl);
+    }
+    return Promise.reject(error);
   }
-  return response;
-});
+);
 
 export default http;
+export { LOGIN_PATH, SESSION_EXPIRED_QUERY };
 export { AUTH_TOKEN_HEADER, AUTH_TOKEN_STORAGE_KEY };
