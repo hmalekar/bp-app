@@ -332,10 +332,20 @@ export interface PendingDisbursementRequestDto {
   Remarks: string;
   CreatedDate: string;
 }
+/** Per-line update for approved amount, status, and audit remarks (optional; used when approver sets approved amounts). */
+export interface DisbursementRequestWorkflowUpdateRecord {
+  RecordNumber: number;
+  ApprovedAmount: number;
+  Status: string;
+  AuditRemarks?: string;
+}
+
 export interface DisbursementRequestWorkflowUpdateRequest {
   DrNumber: number;
   WorkflowStatus: string;
   Comments: string;
+  /** Optional per-line approved amounts and status (A/R/P). */
+  Records?: DisbursementRequestWorkflowUpdateRecord[];
 }
 export interface DisbursementRequestDto {
   Number: number;

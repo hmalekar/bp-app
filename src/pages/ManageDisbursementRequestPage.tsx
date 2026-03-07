@@ -1,15 +1,42 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { apiGet, apiPost } from "../api/client";
+import { apiGet, apiPost, downloadFile } from "../api/client";
 import { getUserRole } from "../api/http";
 import { API_ENDPOINTS } from "../api/contracts/endpoints";
 import { SALES_MIS_WORKFLOW_STATUS } from "../constants/salesMisWorkflowStatus";
+import { DISBURSEMENT_REQUEST_LINE_STATUS } from "../constants/disbursementRequestStatus";
 import type {
   DisbursementRequestCostRecordDto,
   DisbursementRequestDto,
   DisbursementRequestWorkflowUpdateRequest,
   ValidationResponse,
 } from "../api/contracts/types";
+
+/** Parse string to number; allow only digits and one decimal. Returns NaN if invalid or value is undefined/null. */
+function parseAmount(value: string | undefined | null): number {
+  if (value == null) return NaN;
+  const cleaned = String(value)
+    .replace(/[^\d.]/g, "")
+    .replace(/^(\d*\.?\d*).*/, "$1");
+  const num = parseFloat(cleaned);
+  return Number.isNaN(num) ? NaN : num;
+}
+
+/** Clamp approved amount to [0, payable]. */
+function clampApprovedAmount(approved: number, payable: number): number {
+  if (approved < 0) return 0;
+  const max = typeof payable === "number" && !Number.isNaN(payable) ? payable : 0;
+  return approved > max ? max : approved;
+}
+
+/** Derive line status from approved and payable: A = full, R = zero, P = partial. */
+function getLineStatus(approved: number, payable: number): "A" | "R" | "P" {
+  const a = Number(approved);
+  const p = Number(payable);
+  if (a <= 0) return "R";
+  if (p > 0 && a >= p) return "A";
+  return "P";
+}
 
 function ManageDisbursementRequestPage() {
   const { drNumber: drNumberParam } = useParams<"drNumber">();
@@ -22,7 +49,11 @@ function ManageDisbursementRequestPage() {
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectComments, setRejectComments] = useState("");
-
+  /** Approved amount input value per record (RecordNumber -> string). Only used when approver can edit. */
+  const [approvedAmountByRecord, setApprovedAmountByRecord] = useState<Record<number, string>>({});
+  /** Audit remarks per record (RecordNumber -> string). Mandatory when approved amount ≠ payable. */
+  const [auditRemarksByRecord, setAuditRemarksByRecord] = useState<Record<number, string>>({});
+  const [isExporting, setIsExporting] = useState(false);
   const role = getUserRole();
   const isBorrower = role === "B";
 
@@ -66,17 +97,66 @@ function ManageDisbursementRequestPage() {
     };
   }, [drNumberParam, isBorrower]);
 
+  // Initialize approved amount and audit remarks from DR records.
+  useEffect(() => {
+    if (!dr?.Records?.length) {
+      setApprovedAmountByRecord({});
+      setAuditRemarksByRecord({});
+      return;
+    }
+    const nextAmount: Record<number, string> = {};
+    const nextRemarks: Record<number, string> = {};
+    for (const row of dr.Records) {
+      const payable = row.PayableAmount ?? 0;
+      const current = row.ApprovedAmount;
+      const initial = typeof current === "number" && !Number.isNaN(current) ? current : payable;
+      nextAmount[row.RecordNumber] = String(clampApprovedAmount(initial, payable));
+      nextRemarks[row.RecordNumber] = row.AuditRemarks != null ? String(row.AuditRemarks) : "";
+    }
+    setApprovedAmountByRecord(nextAmount);
+    setAuditRemarksByRecord(nextRemarks);
+  }, [dr?.Records]);
+
   const drNumber = drNumberParam != null ? Number(drNumberParam) : null;
 
+  const setApprovedAmountForRecord = (recordNumber: number, raw: string) => {
+    const cleaned = raw.replace(/[^\d.]/g, "").replace(/^(\d*\.?\d*).*/, "$1");
+    setApprovedAmountByRecord((prev) => ({ ...prev, [recordNumber]: cleaned }));
+  };
+
   const handleApprove = async () => {
-    if (drNumber == null || Number.isNaN(drNumber)) return;
+    if (drNumber == null || Number.isNaN(drNumber) || !dr?.Records?.length) return;
     setError(null);
+    const payableByRecord = new Map(dr.Records.map((r) => [r.RecordNumber, r.PayableAmount ?? 0]));
+    const records = dr.Records.map((row) => {
+      const raw = approvedAmountByRecord[row.RecordNumber];
+      const payable = row.PayableAmount ?? 0;
+      const approved = Number.isNaN(parseAmount(raw)) ? 0 : clampApprovedAmount(parseFloat(raw), payable);
+      const status = getLineStatus(approved, payable);
+      const remarks = (auditRemarksByRecord[row.RecordNumber] ?? "").trim();
+      return { RecordNumber: row.RecordNumber, ApprovedAmount: approved, Status: status, AuditRemarks: remarks };
+    });
+    const missingRemarks = records.filter((r) => {
+      const payable = payableByRecord.get(r.RecordNumber) ?? 0;
+      return r.ApprovedAmount !== payable && r.ApprovedAmount > 0 && !(auditRemarksByRecord[r.RecordNumber] ?? "").trim();
+    });
+    if (missingRemarks.length > 0) {
+      setError("Audit remarks are mandatory when approved amount is not equal to payable amount. Please add remarks for the affected line(s).");
+      return;
+    }
+    const statuses = records.map((r) => r.Status);
+    const workflowStatus = statuses.every((s) => s === DISBURSEMENT_REQUEST_LINE_STATUS.APPROVED)
+      ? DISBURSEMENT_REQUEST_LINE_STATUS.APPROVED
+      : statuses.every((s) => s === DISBURSEMENT_REQUEST_LINE_STATUS.REJECTED)
+        ? DISBURSEMENT_REQUEST_LINE_STATUS.REJECTED
+        : DISBURSEMENT_REQUEST_LINE_STATUS.PARTIAL;
     setIsApproving(true);
     try {
       const payload: DisbursementRequestWorkflowUpdateRequest = {
         DrNumber: drNumber,
-        WorkflowStatus: SALES_MIS_WORKFLOW_STATUS.APPROVED,
+        WorkflowStatus: workflowStatus,
         Comments: "",
+        Records: records,
       };
       const result = await apiPost<ValidationResponse>(API_ENDPOINTS.COST_DR_WORKFLOW_UPDATE, payload);
       if (result.IsValid) {
@@ -88,6 +168,22 @@ function ManageDisbursementRequestPage() {
       setError(caught instanceof Error ? caught.message : "Failed to approve");
     } finally {
       setIsApproving(false);
+    }
+  };
+
+  const handleExport = async () => {
+    if (drNumber == null || Number.isNaN(drNumber)) return;
+    setError(null);
+    setIsExporting(true);
+    try {
+      await downloadFile(API_ENDPOINTS.COST_DR_EXPORT, `dr_${drNumber}.xlsx`, {
+        params: { drNumber },
+      });
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Failed to download export";
+      setError(message);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -123,27 +219,99 @@ function ManageDisbursementRequestPage() {
 
   const formatNumber = (n: number) => (n != null && !Number.isNaN(n) ? n.toLocaleString() : "—");
   const cell = (v: string | number | null | undefined) => (v != null && String(v).trim() !== "" ? String(v) : "—");
+  const renderPartyCell = (row: DisbursementRequestCostRecordDto) => {
+    const name = cell(row.PartyName);
+    const gstn = cell(row.PartyGSTN);
+    const pan = cell(row.PartyPAN);
+    const email = cell(row.PartyEmail);
+    const mobile = cell(row.PartyMobile);
+    const line2 = [gstn, pan].filter((x) => x !== "—").join(" · ") || null;
+    const line3 = [email, mobile].filter((x) => x !== "—").join(" · ") || null;
+    if (name === "—" && !line2 && !line3) return "—";
+    return (
+      <span className="d-block small text-break">
+        {name !== "—" && name}
+        {line2 && (
+          <>
+            <br />
+            {line2}
+          </>
+        )}
+        {line3 && (
+          <>
+            <br />
+            {line3}
+          </>
+        )}
+      </span>
+    );
+  };
+  const renderPoWoCell = (row: DisbursementRequestCostRecordDto) => {
+    const po = cell(row.PoWoNumber);
+    const order = formatNumber(row.TotalOrderAmount);
+    if (po === "—" && order === "—") return "—";
+    return <span className="small">{[po, order].filter((x) => x !== "—").join(" / ")}</span>;
+  };
+  const formatDate = (v: string | null | undefined) => {
+    if (v == null || String(v).trim() === "") return "—";
+    const s = String(v).trim();
+    const dateOnly = s.split("T")[0];
+    const [y, m, d] = dateOnly.split("-").map(Number);
+    if (y == null || m == null || d == null || Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return s;
+    const date = new Date(y, m - 1, d);
+    if (Number.isNaN(date.getTime())) return s;
+    return date.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+  };
+  const renderDocCell = (row: DisbursementRequestCostRecordDto) => {
+    const docType = cell(row.DocumentType);
+    const docNo = cell(row.DocumentNumber);
+    const docDate = formatDate(row.DocumentDate);
+    const days = row.PayableDays != null && String(row.PayableDays).trim() !== "" ? String(row.PayableDays) : null;
+    const line1Parts = [docType !== "—" ? docType : null, docNo !== "—" ? `#${docNo}` : null, days != null ? `${days} days` : null].filter(Boolean);
+    const hasDate = docDate !== "—";
+    if (line1Parts.length === 0 && !hasDate) return "—";
+    return (
+      <span className="small d-block text-break">
+        {line1Parts.length > 0 && line1Parts.join(" · ")}
+        {line1Parts.length > 0 && hasDate && <br />}
+        {hasDate && docDate}
+      </span>
+    );
+  };
   const isAlreadyApproved = Boolean(dr?.ApprovalFlag && ["Y", "A"].includes(dr.ApprovalFlag.trim().toUpperCase()));
   const currentUserRole = (role ?? "").trim();
   const isNextApprover = nextApprovalUserRole != null && currentUserRole === (nextApprovalUserRole ?? "").trim();
   const isWorkflowLocked = isAlreadyApproved || !isNextApprover;
 
   return (
-    <div>
-      <div className="d-flex align-items-center justify-content-between mb-3">
+    <div className="manage-dr-page">
+      <div className="d-flex align-items-center justify-content-between mb-3 flex-shrink-0">
         <h2 className="h5 mb-0">Manage Disbursement Request</h2>
-        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/dashboard")}>
-          Back to Dashboard
-        </button>
+        <div className="d-flex gap-2">
+          {dr && (
+            <button
+              type="button"
+              className="btn btn-outline-primary btn-sm"
+              onClick={handleExport}
+              disabled={isExporting}
+              aria-label="Download DR as Excel"
+            >
+              {isExporting ? "Downloading..." : "Export Excel"}
+            </button>
+          )}
+          <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/dashboard")}>
+            Back to Dashboard
+          </button>
+        </div>
       </div>
 
-      {error ? <div className="alert alert-danger">{error}</div> : null}
+      {error ? <div className="alert alert-danger flex-shrink-0">{error}</div> : null}
 
       {isLoading ? (
         <div className="text-muted">Loading disbursement request...</div>
       ) : dr ? (
-        <>
-          <div className="card mb-3">
+        <div className="manage-dr-content d-flex flex-column flex-grow-1 min-h-0">
+          <div className="card mb-3 flex-shrink-0">
             <div className="card-body py-2">
               <p className="mb-0 small">
                 <strong>DR #</strong> {cell(dr.Number)}
@@ -163,6 +331,12 @@ function ManageDisbursementRequestPage() {
               {isWorkflowLocked && <span className="badge bg-secondary ms-2">Approved</span>}
             </div>
             <div className="card-body py-3">
+              {isNextApprover && !isWorkflowLocked && (
+                <p className="small text-muted mb-2">
+                  Edit <strong>Approved amt</strong> (0 to payable) and <strong>Audit remarks</strong> per line. When approved amount ≠ payable, audit
+                  remarks are mandatory. Status: A = full, R = reject (0), P = partial.
+                </p>
+              )}
               <div className="d-flex flex-wrap gap-3 align-items-end">
                 <button type="button" className="btn btn-success" onClick={handleApprove} disabled={isApproving || isRejecting || isWorkflowLocked}>
                   {isApproving ? "Approving..." : "Approve"}
@@ -193,85 +367,107 @@ function ManageDisbursementRequestPage() {
             </div>
           </div>
 
-          <div className="card mb-3">
-            <div className="card-body">
-              <h3 className="h6 card-title mb-3">Cost lines</h3>
-              <div className="table-responsive">
-                <table className="table table-sm table-bordered table-striped align-middle small">
-                  <thead className="table-light">
-                    <tr>
-                      <th>Row</th>
-                      <th>Building</th>
-                      <th>Category</th>
-                      <th>Sub category</th>
-                      <th>Party name</th>
-                      <th>Party GSTN</th>
-                      <th>Party PAN</th>
-                      <th>Party email</th>
-                      <th>Party mobile</th>
-                      <th>Cost reason</th>
-                      <th>PO / WO #</th>
-                      <th>Total order</th>
-                      <th>Doc type</th>
-                      <th>Doc #</th>
-                      <th>Doc date</th>
-                      <th>Payable days</th>
-                      <th>Document amt</th>
-                      <th>GST amt</th>
-                      <th>Total amt</th>
-                      <th>TDS amt</th>
-                      <th>Advance adj.</th>
-                      <th>Retention</th>
-                      <th>Other ded.</th>
-                      <th>Payable amt</th>
-                      <th>Approved amt</th>
-                      <th>Outstanding</th>
-                      <th>Status</th>
-                      <th>Validation</th>
-                      <th>Audit remarks</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(dr.Records ?? []).map((row: DisbursementRequestCostRecordDto) => (
-                      <tr key={row.RecordNumber}>
-                        <td>{row.RecordNumber}</td>
-                        <td>{cell(row.Building)}</td>
-                        <td>{cell(row.Category)}</td>
-                        <td>{cell(row.SubCategory)}</td>
-                        <td>{cell(row.PartyName)}</td>
-                        <td>{cell(row.PartyGSTN)}</td>
-                        <td>{cell(row.PartyPAN)}</td>
-                        <td>{cell(row.PartyEmail)}</td>
-                        <td>{cell(row.PartyMobile)}</td>
-                        <td>{cell(row.CostReason)}</td>
-                        <td>{cell(row.PoWoNumber)}</td>
-                        <td>{formatNumber(row.TotalOrderAmount)}</td>
-                        <td>{cell(row.DocumentType)}</td>
-                        <td>{cell(row.DocumentNumber)}</td>
-                        <td>{cell(row.DocumentDate)}</td>
-                        <td>{cell(row.PayableDays)}</td>
-                        <td>{formatNumber(row.DocumentAmount)}</td>
-                        <td>{formatNumber(row.GstAmount)}</td>
-                        <td>{formatNumber(row.TotalAmount)}</td>
-                        <td>{formatNumber(row.TdsAmount)}</td>
-                        <td>{formatNumber(row.AdvanceAdjustedAmount)}</td>
-                        <td>{formatNumber(row.RetentionAmount)}</td>
-                        <td>{formatNumber(row.AnyOtherDeductions)}</td>
-                        <td>{formatNumber(row.PayableAmount)}</td>
-                        <td>{formatNumber(row.ApprovedAmount)}</td>
-                        <td>{formatNumber(row.OutstandingAmount)}</td>
-                        <td>{cell(row.Status)}</td>
-                        <td className="text-danger small">{cell(row.ValidationErrors)}</td>
-                        <td className="small">{cell(row.AuditRemarks)}</td>
+          <div className="card mb-3 cost-lines-card flex-grow-1 min-h-0 d-flex flex-column">
+            <div className="card-body cost-lines-card-body d-flex flex-column flex-grow-1 min-h-0">
+              <h3 className="h6 card-title mb-3 flex-shrink-0">Cost lines</h3>
+              <div className="cost-lines-table-wrapper flex-grow-1 min-h-0">
+                <div className="cost-lines-scroll" role="region" aria-label="Cost lines table">
+                  <table className="table table-sm table-bordered table-striped align-middle small cost-lines-table">
+                    <thead className="table-light">
+                      <tr>
+                        <th style={{ minWidth: "44px" }}>Row</th>
+                        <th style={{ minWidth: "72px" }}>Building</th>
+                        <th style={{ minWidth: "40px" }}>Category</th>
+                        <th style={{ minWidth: "60px" }}>Sub category</th>
+                        <th style={{ minWidth: "160px" }}>Party</th>
+                        <th style={{ minWidth: "100px" }}>Cost reason</th>
+                        <th style={{ minWidth: "100px" }}>PO/WO · Order</th>
+                        <th style={{ minWidth: "140px" }}>Document</th>
+                        <th style={{ minWidth: "80px" }}>Document amt</th>
+                        <th style={{ minWidth: "72px" }}>GST amt</th>
+                        <th style={{ minWidth: "72px" }}>Total amt</th>
+                        <th style={{ minWidth: "72px" }}>TDS amt</th>
+                        <th style={{ minWidth: "80px" }}>Advance adj.</th>
+                        <th style={{ minWidth: "72px" }}>Retention</th>
+                        <th style={{ minWidth: "72px" }}>Other ded.</th>
+                        <th style={{ minWidth: "80px" }}>Payable amt</th>
+                        <th style={{ minWidth: "100px" }}>Approved amt</th>
+                        <th style={{ minWidth: "88px" }}>Outstanding</th>
+                        <th style={{ minWidth: "180px" }}>Audit remarks</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {(dr.Records ?? []).map((row: DisbursementRequestCostRecordDto) => (
+                        <tr key={row.RecordNumber}>
+                          <td>{row.RecordNumber}</td>
+                          <td className="cost-lines-cell-wrap">{cell(row.Building)}</td>
+                          <td className="cost-lines-cell-wrap">{cell(row.Category)}</td>
+                          <td className="cost-lines-cell-wrap">{cell(row.SubCategory)}</td>
+                          <td className="cost-lines-cell-wrap">{renderPartyCell(row)}</td>
+                          <td className="cost-lines-cell-wrap">{cell(row.CostReason)}</td>
+                          <td className="cost-lines-cell-wrap">{renderPoWoCell(row)}</td>
+                          <td className="cost-lines-cell-wrap">{renderDocCell(row)}</td>
+                          <td>{formatNumber(row.DocumentAmount)}</td>
+                          <td>{formatNumber(row.GstAmount)}</td>
+                          <td>{formatNumber(row.TotalAmount)}</td>
+                          <td>{formatNumber(row.TdsAmount)}</td>
+                          <td>{formatNumber(row.AdvanceAdjustedAmount)}</td>
+                          <td>{formatNumber(row.RetentionAmount)}</td>
+                          <td>{formatNumber(row.AnyOtherDeductions)}</td>
+                          <td>{formatNumber(row.PayableAmount)}</td>
+                          <td>
+                            {isNextApprover && !isWorkflowLocked ? (
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                className="form-control form-control-sm"
+                                style={{ maxWidth: "120px" }}
+                                value={approvedAmountByRecord[row.RecordNumber] ?? ""}
+                                onChange={(e) => setApprovedAmountForRecord(row.RecordNumber, e.target.value)}
+                                onBlur={(e) => {
+                                  const num = parseAmount(e.target.value);
+                                  const payable = row.PayableAmount ?? 0;
+                                  if (!Number.isNaN(num))
+                                    setApprovedAmountByRecord((prev) => ({ ...prev, [row.RecordNumber]: String(clampApprovedAmount(num, payable)) }));
+                                }}
+                                aria-label={`Approved amount for row ${row.RecordNumber} (0 to ${row.PayableAmount ?? 0})`}
+                              />
+                            ) : (
+                              formatNumber(row.ApprovedAmount)
+                            )}
+                          </td>
+                          <td>{formatNumber(row.OutstandingAmount)}</td>
+                          <td className="audit-remarks-cell" style={{ minWidth: "180px" }}>
+                            {isNextApprover && !isWorkflowLocked ? (
+                              <textarea
+                                rows={2}
+                                className={`form-control form-control-sm ${(() => {
+                                  const raw = approvedAmountByRecord[row.RecordNumber];
+                                  const payable = row.PayableAmount ?? 0;
+                                  const approved = Number.isNaN(parseAmount(raw)) ? 0 : clampApprovedAmount(parseFloat(raw), payable);
+                                  const remarks = (auditRemarksByRecord[row.RecordNumber] ?? "").trim();
+                                  const needsRemarks = approved > 0 && approved !== payable;
+                                  return needsRemarks && !remarks ? "border-danger" : "";
+                                })()}`}
+                                value={auditRemarksByRecord[row.RecordNumber] ?? ""}
+                                onChange={(e) => setAuditRemarksByRecord((prev) => ({ ...prev, [row.RecordNumber]: e.target.value }))}
+                                placeholder="Required if approved ≠ payable"
+                                aria-label={`Audit remarks for row ${row.RecordNumber}`}
+                              />
+                            ) : (
+                              <span className="small">{cell(row.AuditRemarks)}</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
               {(!dr.Records || dr.Records.length === 0) && <p className="text-muted mb-0">No cost lines.</p>}
             </div>
           </div>
-        </>
+        </div>
       ) : !error && !isLoading ? (
         <div className="text-muted">No disbursement request found.</div>
       ) : null}

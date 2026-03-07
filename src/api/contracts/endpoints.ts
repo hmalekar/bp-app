@@ -19,6 +19,7 @@ export const API_ENDPOINTS = {
   COST_PENDING_DR: "/api/v1/cost/pending_dr",
   COST_DR_WORKFLOW_UPDATE: "/api/v1/cost/dr_workflow_update",
   COST_DR: "/api/v1/cost/dr",
+  COST_DR_EXPORT: "/api/v1/cost/dr_export",
 } as const;
 
 export type ApiEndpointGroup = keyof typeof API_ENDPOINTS;

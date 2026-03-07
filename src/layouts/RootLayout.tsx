@@ -19,9 +19,7 @@ function RootLayout() {
   const userRole = getUserRole();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const pageName =
-    PATH_PAGE_NAMES[pathname] ??
-    (pathname.startsWith("/manage-disbursement-request") ? "Manage Disbursement Request" : "");
+  const pageName = PATH_PAGE_NAMES[pathname] ?? (pathname.startsWith("/manage-disbursement-request") ? "Manage Disbursement Request" : "");
 
   const handleLogout = () => {
     clearAuthToken();
@@ -31,7 +29,7 @@ function RootLayout() {
   };
 
   return (
-    <div className="min-vh-100 d-flex flex-column">
+    <div className="root-layout d-flex flex-column">
       <nav className="navbar navbar-expand-lg navbar-dark bg-primary">
         <div className="container-fluid">
           <NavLink className="navbar-brand" to="/">
@@ -79,7 +77,7 @@ function RootLayout() {
         </div>
       </nav>
 
-      <main className="container-fluid py-4 flex-grow-1">
+      <main className="container-fluid py-4 flex-grow-1 root-layout-main">
         <Outlet />
       </main>
 

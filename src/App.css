@@ -5,6 +5,19 @@
   text-align: left;
 }
 
+/* Root layout: fix to viewport so header and footer stay on screen; only main scrolls */
+.root-layout {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+}
+.root-layout-main {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -31,10 +44,6 @@
   a:nth-of-type(2) .logo {
     animation: logo-spin infinite 20s linear;
   }
-}
-
-.card {
-  padding: 2em;
 }
 
 .read-the-docs {
@@ -131,4 +140,69 @@
 .excel-grid td {
   min-width: 160px;
   white-space: nowrap;
+}
+
+/* Manage DR page: fill main so header/footer stay on screen; no main scroll */
+.manage-dr-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.manage-dr-page .manage-dr-content {
+  min-height: 0;
+}
+.manage-dr-page .cost-lines-card,
+.manage-dr-page .cost-lines-card-body,
+.manage-dr-page .cost-lines-table-wrapper {
+  min-height: 0;
+}
+.manage-dr-page .cost-lines-scroll {
+  height: 100%;
+  max-height: none;
+  min-height: 0;
+}
+
+/* Cost lines: card must not expand the page; only .cost-lines-scroll scrolls */
+.cost-lines-card {
+  overflow: hidden;
+  max-width: 100%;
+}
+.cost-lines-card .cost-lines-card-body {
+  max-width: 100%;
+}
+.cost-lines-table-wrapper {
+  max-width: 100%;
+  overflow: hidden;
+}
+.cost-lines-scroll {
+  max-height: min(70vh, calc(100vh - 280px));
+  overflow: auto;
+  width: 100%;
+  max-width: 100%;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  -webkit-overflow-scrolling: touch;
+}
+.cost-lines-scroll .cost-lines-table {
+  margin: 0;
+  min-width: 1200px;
+}
+/* Sticky header: scroll happens in .cost-lines-scroll so thead th sticks to its top */
+.cost-lines-scroll .cost-lines-table thead th {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10;
+  background: #f8f9fa !important;
+  white-space: nowrap;
+  box-shadow: 0 1px 0 0 #dee2e6;
+}
+/* Cost lines table: prevent wrapping except audit remarks column */
+.cost-lines-table td {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.cost-lines-table td.audit-remarks-cell,
+.cost-lines-table td.cost-lines-cell-wrap {
+  white-space: normal;
 }
