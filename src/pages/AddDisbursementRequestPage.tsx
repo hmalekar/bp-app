@@ -14,6 +14,7 @@ import { SALES_MIS_WORKFLOW_STATUS } from "../constants/salesMisWorkflowStatus";
 function AddDisbursementRequestPage() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [projects, setProjects] = useState<ProjectRecordDto[]>([]);
   const [selectedProjectNumber, setSelectedProjectNumber] = useState<number | "">("");
   const [projectsLoading, setProjectsLoading] = useState(true);
@@ -27,7 +28,12 @@ function AddDisbursementRequestPage() {
   const [isSubmittedForApproval, setIsSubmittedForApproval] = useState(false);
   const [submitInProgress, setSubmitInProgress] = useState(false);
   const [recallInProgress, setRecallInProgress] = useState(false);
+  const [deleteInProgress, setDeleteInProgress] = useState(false);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentUploading, setAttachmentUploading] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [attachmentSuccess, setAttachmentSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -84,6 +90,13 @@ function AddDisbursementRequestPage() {
     setImportResult(null);
   };
 
+  const handleAttachmentFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setAttachmentFile(file);
+    setAttachmentError(null);
+    setAttachmentSuccess(null);
+  };
+
   const uploadSucceeded = Boolean(importResult && (importResult.IsValid || importResult.DisbursementRequestNumber != null));
   const drNumber = importResult?.DisbursementRequestNumber ?? null;
   const hasDr = Boolean(uploadSucceeded && drNumber != null);
@@ -136,6 +149,28 @@ function AddDisbursementRequestPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!hasDr || deleteInProgress || drNumber == null) return;
+    setWorkflowError(null);
+    setDeleteInProgress(true);
+    try {
+      const url = `${API_ENDPOINTS.COST_DR_DELETE}?drNumber=${encodeURIComponent(drNumber)}`;
+      const result = await apiPost<ValidationResponse>(url);
+      if (result.IsValid) {
+        const message = result.Message && result.Message.trim().length > 0 ? result.Message : "Disbursement request deleted successfully.";
+        alert(message);
+        navigate("/dashboard");
+      } else {
+        setWorkflowError(result.Message ?? "Delete failed.");
+      }
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Failed to delete disbursement request";
+      setWorkflowError(message);
+    } finally {
+      setDeleteInProgress(false);
+    }
+  };
+
   const handleUpload = async () => {
     if (uploadSucceeded || selectedProjectNumber === "" || !selectedFile) return;
     setUploadError(null);
@@ -144,8 +179,9 @@ function AddDisbursementRequestPage() {
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
-      const result = await apiPost<DisbursementRequestImportResult>(API_ENDPOINTS.COST_DR_IMPORT, formData, {
-        params: { projectNumber: selectedProjectNumber, remarks: remarks || undefined },
+      const remarksParam = remarks ?? "";
+      const url = `${API_ENDPOINTS.COST_DR_IMPORT}?projectNumber=${encodeURIComponent(selectedProjectNumber)}&remarks=${encodeURIComponent(remarksParam)}`;
+      const result = await apiPost<DisbursementRequestImportResult>(url, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -161,6 +197,41 @@ function AddDisbursementRequestPage() {
       setUploadError(message);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleUploadAttachment = async () => {
+    if (!hasDr || drNumber == null || !attachmentFile || attachmentUploading) return;
+
+    const lowerName = attachmentFile.name.toLowerCase();
+    if (!lowerName.endsWith(".zip") && !lowerName.endsWith(".rar")) {
+      setAttachmentError("Only .zip and .rar files are allowed.");
+      return;
+    }
+
+    setAttachmentError(null);
+    setAttachmentSuccess(null);
+    setAttachmentUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", attachmentFile);
+      const url = `${API_ENDPOINTS.COST_DR_ATTACHMENT}?drNumber=${encodeURIComponent(drNumber)}`;
+      const result = await apiPost<{ FileName?: string; Path?: string }>(url, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      const fileName = result.FileName || "attachment";
+      setAttachmentSuccess(`Attachment uploaded successfully as ${fileName}.`);
+      setAttachmentFile(null);
+      if (attachmentInputRef.current) {
+        attachmentInputRef.current.value = "";
+      }
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Failed to upload attachment";
+      setAttachmentError(message);
+    } finally {
+      setAttachmentUploading(false);
     }
   };
 
@@ -295,6 +366,11 @@ function AddDisbursementRequestPage() {
                   >
                     {recallInProgress ? "Recalling..." : "Recall"}
                   </button>
+                  {hasDr && (
+                    <button type="button" className="btn btn-outline-danger" onClick={handleDelete} disabled={deleteInProgress}>
+                      {deleteInProgress ? "Deleting..." : "Delete"}
+                    </button>
+                  )}
                 </div>
               </>
             ) : (
@@ -334,6 +410,43 @@ function AddDisbursementRequestPage() {
                 )}
               </>
             )}
+          </div>
+        </div>
+      )}
+      {hasDr && (
+        <div className="card mb-3">
+          <div className="card-body">
+            <h3 className="h6 card-title mb-3">Upload attachment</h3>
+            <p className="text-muted small mb-3">Upload a single compressed file (.zip or .rar) for this disbursement request.</p>
+            {attachmentError ? <div className="alert alert-danger mb-3">{attachmentError}</div> : null}
+            {attachmentSuccess ? <div className="alert alert-success mb-3">{attachmentSuccess}</div> : null}
+            <div className="mb-3">
+              <label htmlFor="dr-attachment" className="form-label">
+                Attachment
+              </label>
+              <input
+                ref={attachmentInputRef}
+                type="file"
+                className="form-control"
+                id="dr-attachment"
+                accept=".zip,.rar"
+                onChange={handleAttachmentFileChange}
+                disabled={attachmentUploading || !hasDr}
+              />
+              {attachmentFile && (
+                <div className="form-text mt-1">
+                  Selected: {attachmentFile.name} ({(attachmentFile.size / 1024).toFixed(2)} KB)
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleUploadAttachment}
+              disabled={!attachmentFile || attachmentUploading || !hasDr}
+            >
+              {attachmentUploading ? "Uploading..." : "Upload attachment"}
+            </button>
           </div>
         </div>
       )}

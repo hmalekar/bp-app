@@ -313,6 +313,7 @@ export interface DisbursementRequestCostRecordDto {
   Status: string;
   ValidationErrors: string;
   AuditRemarks: string;
+  Remarks: string;
 }
 export interface DisbursementRequestImportResult extends ValidationResponse {
   DisbursementRequestNumber: number;
