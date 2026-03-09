@@ -53,6 +53,8 @@ function ManageDisbursementRequestPage() {
   const [approvedAmountByRecord, setApprovedAmountByRecord] = useState<Record<number, string>>({});
   /** Audit remarks per record (RecordNumber -> string). Mandatory when approved amount ≠ payable. */
   const [auditRemarksByRecord, setAuditRemarksByRecord] = useState<Record<number, string>>({});
+  /** Committed approved amount per record (updated on blur only); used for row highlight. */
+  const [committedApprovedByRecord, setCommittedApprovedByRecord] = useState<Record<number, number>>({});
   const [isExporting, setIsExporting] = useState(false);
   const role = getUserRole();
   const isBorrower = role === "B";
@@ -97,23 +99,28 @@ function ManageDisbursementRequestPage() {
     };
   }, [drNumberParam, isBorrower]);
 
-  // Initialize approved amount and audit remarks from DR records.
+  // Initialize approved amount, audit remarks, and committed approved (for row highlight) from DR records.
   useEffect(() => {
     if (!dr?.Records?.length) {
       setApprovedAmountByRecord({});
       setAuditRemarksByRecord({});
+      setCommittedApprovedByRecord({});
       return;
     }
     const nextAmount: Record<number, string> = {};
+    const nextCommitted: Record<number, number> = {};
     const nextRemarks: Record<number, string> = {};
     for (const row of dr.Records) {
       const payable = row.PayableAmount ?? 0;
       const current = row.ApprovedAmount;
       const initial = typeof current === "number" && !Number.isNaN(current) ? current : payable;
-      nextAmount[row.RecordNumber] = String(clampApprovedAmount(initial, payable));
+      const clamped = clampApprovedAmount(initial, payable);
+      nextAmount[row.RecordNumber] = String(clamped);
+      nextCommitted[row.RecordNumber] = clamped;
       nextRemarks[row.RecordNumber] = row.AuditRemarks != null ? String(row.AuditRemarks) : "";
     }
     setApprovedAmountByRecord(nextAmount);
+    setCommittedApprovedByRecord(nextCommitted);
     setAuditRemarksByRecord(nextRemarks);
   }, [dr?.Records]);
 
@@ -278,6 +285,21 @@ function ManageDisbursementRequestPage() {
       </span>
     );
   };
+  const getApprovedAmountForRow = (row: DisbursementRequestCostRecordDto) => {
+    if (isNextApprover && !isWorkflowLocked) {
+      const committed = committedApprovedByRecord[row.RecordNumber];
+      return typeof committed === "number" && !Number.isNaN(committed) ? committed : 0;
+    }
+    const a = row.ApprovedAmount;
+    return typeof a === "number" && !Number.isNaN(a) ? a : 0;
+  };
+  const getRowHighlightClass = (row: DisbursementRequestCostRecordDto) => {
+    const approved = getApprovedAmountForRow(row);
+    const payable = row.PayableAmount ?? 0;
+    if (approved <= 0) return "table-danger";
+    if (payable > 0 && approved < payable) return "table-warning";
+    return "";
+  };
   const isAlreadyApproved = Boolean(dr?.ApprovalFlag && ["Y", "A"].includes(dr.ApprovalFlag.trim().toUpperCase()));
   const currentUserRole = (role ?? "").trim();
   const isNextApprover = nextApprovalUserRole != null && currentUserRole === (nextApprovalUserRole ?? "").trim();
@@ -398,7 +420,7 @@ function ManageDisbursementRequestPage() {
                     </thead>
                     <tbody>
                       {(dr.Records ?? []).map((row: DisbursementRequestCostRecordDto) => (
-                        <tr key={row.RecordNumber}>
+                        <tr key={row.RecordNumber} className={getRowHighlightClass(row)}>
                           <td>{row.RecordNumber}</td>
                           <td className="cost-lines-cell-wrap">{cell(row.Building)}</td>
                           <td className="cost-lines-cell-wrap">{cell(row.Category)}</td>
@@ -427,8 +449,9 @@ function ManageDisbursementRequestPage() {
                                 onBlur={(e) => {
                                   const num = parseAmount(e.target.value);
                                   const payable = row.PayableAmount ?? 0;
-                                  if (!Number.isNaN(num))
-                                    setApprovedAmountByRecord((prev) => ({ ...prev, [row.RecordNumber]: String(clampApprovedAmount(num, payable)) }));
+                                  const clamped = Number.isNaN(num) ? 0 : clampApprovedAmount(num, payable);
+                                  setApprovedAmountByRecord((prev) => ({ ...prev, [row.RecordNumber]: String(clamped) }));
+                                  setCommittedApprovedByRecord((prev) => ({ ...prev, [row.RecordNumber]: clamped }));
                                 }}
                                 aria-label={`Approved amount for row ${row.RecordNumber} (0 to ${row.PayableAmount ?? 0})`}
                               />
