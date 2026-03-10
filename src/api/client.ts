@@ -45,3 +45,4 @@ export const downloadFile = async (
 
   return { blob: response.data, fileName: resolvedName }
 }
+

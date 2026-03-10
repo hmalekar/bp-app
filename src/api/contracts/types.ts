@@ -339,6 +339,7 @@ export interface DisbursementRequestWorkflowUpdateRecord {
   ApprovedAmount: number;
   Status: string;
   AuditRemarks?: string;
+  Remarks?: string;
 }
 
 export interface DisbursementRequestWorkflowUpdateRequest {
@@ -354,5 +355,7 @@ export interface DisbursementRequestDto {
   YearMonth: number;
   Remarks: string;
   ApprovalFlag: string;
+  /** Workflow status caption from API (e.g. "Submitted for Approval", "Recalled"). */
+  LatestWorkflowStatus?: string;
   Records: DisbursementRequestCostRecordDto[];
 }

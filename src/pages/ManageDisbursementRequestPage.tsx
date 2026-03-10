@@ -48,6 +48,7 @@ function ManageDisbursementRequestPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
+  const [isDownloadingAttachment, setIsDownloadingAttachment] = useState(false);
   const [rejectComments, setRejectComments] = useState("");
   /** Approved amount input value per record (RecordNumber -> string). Only used when approver can edit. */
   const [approvedAmountByRecord, setApprovedAmountByRecord] = useState<Record<number, string>>({});
@@ -178,6 +179,24 @@ function ManageDisbursementRequestPage() {
     }
   };
 
+  const handleDownloadAttachment = async () => {
+    if (drNumber == null || Number.isNaN(drNumber)) return;
+    setError(null);
+    setIsDownloadingAttachment(true);
+    try {
+      //const url = `${API_ENDPOINTS.COST_DR_DOWNLOAD_ATTACHMENT}?drNumber=${encodeURIComponent(drNumber)}`;
+      //await downloadFile(url, `dr_${drNumber}_attachment.xlsx`);
+      await downloadFile(API_ENDPOINTS.COST_DR_DOWNLOAD_ATTACHMENT, `dr_${drNumber}.zip`, {
+        params: { drNumber },
+      });
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Failed to download attachment";
+      setError(message);
+    } finally {
+      setIsDownloadingAttachment(false);
+    }
+  };
+
   const handleExport = async () => {
     if (drNumber == null || Number.isNaN(drNumber)) return;
     setError(null);
@@ -195,7 +214,7 @@ function ManageDisbursementRequestPage() {
   };
 
   const handleReject = async () => {
-    if (drNumber == null || Number.isNaN(drNumber)) return;
+    if (drNumber == null || Number.isNaN(drNumber) || !dr?.Records?.length) return;
     const comments = rejectComments.trim();
     if (!comments) {
       setError("Please enter comments for rejection.");
@@ -204,10 +223,19 @@ function ManageDisbursementRequestPage() {
     setError(null);
     setIsRejecting(true);
     try {
+      const records = dr.Records.map((row) => {
+        const raw = approvedAmountByRecord[row.RecordNumber];
+        const payable = row.PayableAmount ?? 0;
+        const approved = Number.isNaN(parseAmount(raw)) ? 0 : clampApprovedAmount(parseFloat(raw), payable);
+        const status = getLineStatus(approved, payable);
+        const remarks = (auditRemarksByRecord[row.RecordNumber] ?? "").trim();
+        return { RecordNumber: row.RecordNumber, ApprovedAmount: approved, Status: status, AuditRemarks: remarks };
+      });
       const payload: DisbursementRequestWorkflowUpdateRequest = {
         DrNumber: drNumber,
         WorkflowStatus: SALES_MIS_WORKFLOW_STATUS.REJECTED,
         Comments: comments,
+        Records: records,
       };
       const result = await apiPost<ValidationResponse>(API_ENDPOINTS.COST_DR_WORKFLOW_UPDATE, payload);
       if (result.IsValid) {
@@ -310,6 +338,17 @@ function ManageDisbursementRequestPage() {
       <div className="d-flex align-items-center justify-content-between mb-3 flex-shrink-0">
         <h2 className="h5 mb-0">Manage Disbursement Request</h2>
         <div className="d-flex gap-2">
+          {dr && (
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm"
+              onClick={handleDownloadAttachment}
+              disabled={isDownloadingAttachment}
+              aria-label="Download DR attachment"
+            >
+              {isDownloadingAttachment ? "Downloading..." : "Download Attachment"}
+            </button>
+          )}
           {dr && (
             <button
               type="button"

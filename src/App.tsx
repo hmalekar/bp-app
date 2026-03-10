@@ -13,6 +13,7 @@ import UploadSalesMisPage from "./pages/UploadSalesMisPage";
 import ReviewSalesMisPage from "./pages/ReviewSalesMisPage";
 import AddDisbursementRequestPage from "./pages/AddDisbursementRequestPage";
 import ManageDisbursementRequestPage from "./pages/ManageDisbursementRequestPage";
+import BorrowerDisbursementRequestPage from "./pages/BorrowerDisbursementRequestPage";
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
         <Route path="review-sales-mis" element={<ReviewSalesMisPage />} />
         <Route path="add-disbursement-request" element={<AddDisbursementRequestPage />} />
         <Route path="manage-disbursement-request/:drNumber" element={<ManageDisbursementRequestPage />} />
+        <Route path="my-disbursement-request/:drNumber" element={<BorrowerDisbursementRequestPage />} />
       </Route>
       <Route element={<AuthLayout />}>
         <Route path="login" element={<LoginPage />} />

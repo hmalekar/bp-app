@@ -204,16 +204,26 @@ function DashboardPage() {
                       <td>{dr.CreatedDate || "—"}</td>
                       <td>
                         {isBorrower ? (
-                          <span className="text-muted">—</span>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            onClick={() =>
+                              navigate(`/my-disbursement-request/${dr.DrNumber}`, {
+                                state: { pendingDr: dr },
+                              })
+                            }
+                          >
+                            View / Edit
+                          </button>
                         ) : (
                           <button
                             type="button"
                             className="btn btn-sm btn-primary"
                             onClick={() =>
-                            navigate(`/manage-disbursement-request/${dr.DrNumber}`, {
-                              state: { nextApprovalUserRole: dr.NextApprovalUserRole },
-                            })
-                          }
+                              navigate(`/manage-disbursement-request/${dr.DrNumber}`, {
+                                state: { nextApprovalUserRole: dr.NextApprovalUserRole },
+                              })
+                            }
                           >
                             Action
                           </button>
