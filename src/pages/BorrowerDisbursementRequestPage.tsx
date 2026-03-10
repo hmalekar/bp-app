@@ -10,7 +10,7 @@ import type {
   PendingDisbursementRequestDto,
   ValidationResponse,
 } from "../api/contracts/types";
-import { SALES_MIS_WORKFLOW_STATUS } from "../constants/salesMisWorkflowStatus";
+import { getSalesMisStatusBadgeClass, SALES_MIS_WORKFLOW_STATUS } from "../constants/salesMisWorkflowStatus";
 
 function BorrowerDisbursementRequestPage() {
   const { drNumber: drNumberParam } = useParams<"drNumber">();
@@ -94,6 +94,9 @@ function BorrowerDisbursementRequestPage() {
   const drNumber = drNumberParam != null ? Number(drNumberParam) : null;
   const approvalFlag = (dr?.ApprovalFlag ?? "").trim().toUpperCase();
   const workflowStatusCaption = (dr?.LatestWorkflowStatus ?? lastKnownWorkflowStatus ?? pendingDrFromNav?.LatestWorkflowStatus ?? "").trim();
+  const statusDisplay =
+    workflowStatusCaption ||
+    (approvalFlag === "S" ? "Submitted for Approval" : approvalFlag === "R" ? "Rejected" : approvalFlag === "A" || approvalFlag === "Y" ? "Approved" : approvalFlag || "—");
 
   const isSubmittedForApproval = approvalFlag === "S" || workflowStatusCaption.toLowerCase() === "submitted for approval";
   const isRejected = approvalFlag === "R" || workflowStatusCaption.toLowerCase() === "rejected";
@@ -288,14 +291,12 @@ function BorrowerDisbursementRequestPage() {
                 <strong>Project</strong> {dr.ProjectNumber}
               </p>
               <p className="mb-0 small">
-                <strong>Your remarks</strong>{" "}
-                <textarea
-                  className="form-control form-control-sm mt-1"
-                  rows={2}
-                  value={borrowerRemarks}
-                  onChange={(e) => setBorrowerRemarks(e.target.value)}
-                  placeholder={isRejected ? "Add remarks explaining the updated submission..." : "Optional remarks"}
-                />
+                <strong>Remarks</strong> {dr.Remarks ?? "—"}
+                <span className="text-muted mx-2">·</span>
+                <strong>Status</strong>{" "}
+                <span className={`badge ${getSalesMisStatusBadgeClass(statusDisplay === "—" ? "" : statusDisplay)}`}>
+                  {statusDisplay}
+                </span>
               </p>
             </div>
           </div>

@@ -126,6 +126,7 @@ function ManageDisbursementRequestPage() {
   }, [dr?.Records]);
 
   const drNumber = drNumberParam != null ? Number(drNumberParam) : null;
+  const approvalFlag = (dr?.ApprovalFlag ?? "").trim().toUpperCase();
 
   const setApprovedAmountForRecord = (recordNumber: number, raw: string) => {
     const cleaned = raw.replace(/[^\d.]/g, "").replace(/^(\d*\.?\d*).*/, "$1");
@@ -137,9 +138,11 @@ function ManageDisbursementRequestPage() {
     setError(null);
     const payableByRecord = new Map(dr.Records.map((r) => [r.RecordNumber, r.PayableAmount ?? 0]));
     const records = dr.Records.map((row) => {
-      const raw = approvedAmountByRecord[row.RecordNumber];
       const payable = row.PayableAmount ?? 0;
-      const approved = Number.isNaN(parseAmount(raw)) ? 0 : clampApprovedAmount(parseFloat(raw), payable);
+      const committed = committedApprovedByRecord[row.RecordNumber];
+      const raw = approvedAmountByRecord[row.RecordNumber];
+      const fromInput = Number.isNaN(parseAmount(raw)) ? NaN : clampApprovedAmount(parseFloat(raw), payable);
+      const approved = typeof committed === "number" && !Number.isNaN(committed) ? committed : Number.isNaN(fromInput) ? 0 : fromInput;
       const status = getLineStatus(approved, payable);
       const remarks = (auditRemarksByRecord[row.RecordNumber] ?? "").trim();
       return { RecordNumber: row.RecordNumber, ApprovedAmount: approved, Status: status, AuditRemarks: remarks };
@@ -191,7 +194,7 @@ function ManageDisbursementRequestPage() {
       });
     } catch (caught) {
       const status = (caught as { response?: { status?: number } })?.response?.status;
-      const message = status === 404 ? "No attachment found" : (caught instanceof Error ? caught.message : "Failed to download attachment");
+      const message = status === 404 ? "No attachment found" : caught instanceof Error ? caught.message : "Failed to download attachment";
       setError(message);
     } finally {
       setIsDownloadingAttachment(false);
@@ -375,14 +378,33 @@ function ManageDisbursementRequestPage() {
         <div className="manage-dr-content d-flex flex-column flex-grow-1 min-h-0">
           <div className="card mb-3 flex-shrink-0">
             <div className="card-body py-2">
-              <p className="mb-0 small">
+              <p className="mb-1 small">
                 <strong>DR #</strong> {cell(dr.Number)}
                 <span className="text-muted mx-2">·</span>
                 <strong>Project</strong> {cell(dr.ProjectNumber)}
                 <span className="text-muted mx-2">·</span>
                 <strong>Year / month</strong> {cell(dr.YearMonth)}
-                <span className="text-muted mx-2">·</span>
+              </p>
+              <p className="mb-0 small">
                 <strong>Remarks</strong> {cell(dr.Remarks)}
+                <span className="text-muted mx-2">·</span>
+                <strong>Status</strong>{" "}
+                {(() => {
+                  const caption = (dr.LatestWorkflowStatus ?? "").trim();
+                  if (caption) return caption;
+                  if (!approvalFlag) return "—";
+                  switch (approvalFlag) {
+                    case "S":
+                      return "Submitted for Approval";
+                    case "R":
+                      return "Rejected";
+                    case "A":
+                    case "Y":
+                      return "Approved";
+                    default:
+                      return approvalFlag;
+                  }
+                })()}
               </p>
             </div>
           </div>
