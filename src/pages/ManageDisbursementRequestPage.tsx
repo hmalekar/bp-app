@@ -190,7 +190,8 @@ function ManageDisbursementRequestPage() {
         params: { drNumber },
       });
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : "Failed to download attachment";
+      const status = (caught as { response?: { status?: number } })?.response?.status;
+      const message = status === 404 ? "No attachment found" : (caught instanceof Error ? caught.message : "Failed to download attachment");
       setError(message);
     } finally {
       setIsDownloadingAttachment(false);

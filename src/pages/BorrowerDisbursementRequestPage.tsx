@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { apiGet, apiPost } from "../api/client";
+import { apiGet, apiPost, downloadFile } from "../api/client";
 import { getUserRole } from "../api/http";
 import { API_ENDPOINTS } from "../api/contracts/endpoints";
 import type {
   DisbursementRequestCostRecordDto,
   DisbursementRequestDto,
-  DisbursementRequestImportResult,
   DisbursementRequestWorkflowUpdateRequest,
   PendingDisbursementRequestDto,
   ValidationResponse,
@@ -31,9 +30,12 @@ function BorrowerDisbursementRequestPage() {
   const [reuploadError, setReuploadError] = useState<string | null>(null);
   const [reuploadSuccess, setReuploadSuccess] = useState<string | null>(null);
   const [deleteInProgress, setDeleteInProgress] = useState(false);
+  const [isDownloadingAttachment, setIsDownloadingAttachment] = useState(false);
   const [submitInProgress, setSubmitInProgress] = useState(false);
   const [recallInProgress, setRecallInProgress] = useState(false);
   const [lastKnownWorkflowStatus, setLastKnownWorkflowStatus] = useState<string | null>(null);
+  /** Per-line borrower remarks (editable only when that row has audit remarks). */
+  const [borrowerRemarksByRecord, setBorrowerRemarksByRecord] = useState<Record<number, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -76,34 +78,48 @@ function BorrowerDisbursementRequestPage() {
     };
   }, [drNumberParam, isBorrower]);
 
+  // Initialize per-line borrower remarks from DR records
+  useEffect(() => {
+    if (!dr?.Records?.length) {
+      setBorrowerRemarksByRecord({});
+      return;
+    }
+    const next: Record<number, string> = {};
+    for (const row of dr.Records) {
+      next[row.RecordNumber] = row.Remarks != null ? String(row.Remarks) : "";
+    }
+    setBorrowerRemarksByRecord(next);
+  }, [dr?.Records]);
+
   const drNumber = drNumberParam != null ? Number(drNumberParam) : null;
   const approvalFlag = (dr?.ApprovalFlag ?? "").trim().toUpperCase();
-  const workflowStatusCaption = (
-    dr?.LatestWorkflowStatus ??
-    lastKnownWorkflowStatus ??
-    pendingDrFromNav?.LatestWorkflowStatus ??
-    ""
-  ).trim();
+  const workflowStatusCaption = (dr?.LatestWorkflowStatus ?? lastKnownWorkflowStatus ?? pendingDrFromNav?.LatestWorkflowStatus ?? "").trim();
 
-  const isSubmittedForApproval =
-    approvalFlag === "S" || workflowStatusCaption.toLowerCase() === "submitted for approval";
+  const isSubmittedForApproval = approvalFlag === "S" || workflowStatusCaption.toLowerCase() === "submitted for approval";
   const isRejected = approvalFlag === "R" || workflowStatusCaption.toLowerCase() === "rejected";
   const isApproved = approvalFlag === "A" || approvalFlag === "Y" || workflowStatusCaption.toLowerCase() === "approved";
   // Rejected DRs can be re-submitted (e.g. after re-upload); only block when pending approval or already approved
-  const isSubmittedOrFinal =
-    isSubmittedForApproval || isApproved || ["S", "A", "Y"].includes(approvalFlag);
+  const isSubmittedOrFinal = isSubmittedForApproval || isApproved || ["S", "A", "Y"].includes(approvalFlag);
   const canSubmitForApproval = Boolean(dr && !isSubmittedOrFinal);
   const uploadSectionLocked = isSubmittedForApproval;
 
   const handleSubmitForApproval = async () => {
-    if (!canSubmitForApproval || drNumber == null || submitInProgress) return;
+    if (!canSubmitForApproval || drNumber == null || submitInProgress || !dr?.Records?.length) return;
     setError(null);
     setSubmitInProgress(true);
     try {
+      const records = dr.Records.map((row) => ({
+        RecordNumber: row.RecordNumber,
+        ApprovedAmount: row.ApprovedAmount ?? 0,
+        Status: row.Status ?? "",
+        AuditRemarks: (row.AuditRemarks ?? "").trim() || undefined,
+        Remarks: (borrowerRemarksByRecord[row.RecordNumber] ?? "").trim() || undefined,
+      }));
       const payload: DisbursementRequestWorkflowUpdateRequest = {
         DrNumber: drNumber,
         WorkflowStatus: SALES_MIS_WORKFLOW_STATUS.SUBMITTED_FOR_APPROVAL,
         Comments: "",
+        Records: records,
       };
       const result = await apiPost<ValidationResponse>(API_ENDPOINTS.COST_DR_WORKFLOW_UPDATE, payload);
       if (result.IsValid) {
@@ -155,7 +171,14 @@ function BorrowerDisbursementRequestPage() {
   };
 
   const handleReupload = async () => {
-    if (!isBorrower || drNumber == null || !reuploadFile || reuploadUploading || !dr) return;
+    if (!isBorrower || drNumber == null || !reuploadFile || reuploadUploading) return;
+
+    const name = reuploadFile.name ?? "";
+    const isZipOrRar = /\.(zip|rar)$/i.test(name);
+    if (!isZipOrRar) {
+      setReuploadError("Only .zip and .rar files are allowed for attachments.");
+      return;
+    }
 
     setReuploadError(null);
     setReuploadSuccess(null);
@@ -163,31 +186,18 @@ function BorrowerDisbursementRequestPage() {
     try {
       const formData = new FormData();
       formData.append("file", reuploadFile);
-      const remarksParam = (borrowerRemarks ?? "").trim();
-      const url = `${API_ENDPOINTS.COST_DR_IMPORT}?projectNumber=${encodeURIComponent(dr.ProjectNumber)}&remarks=${encodeURIComponent(remarksParam)}`;
-      const result = await apiPost<DisbursementRequestImportResult>(url, formData, {
+      const url = `${API_ENDPOINTS.COST_DR_ATTACHMENT}?drNumber=${encodeURIComponent(drNumber)}`;
+      const result = await apiPost<{ FileName?: string; Path?: string }>(url, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
-      if (result.IsValid) {
-        setReuploadSuccess(result.Message?.trim() || "File re-uploaded successfully. Previous file has been replaced.");
-        setReuploadFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        // Refresh DR details to reflect any changes.
-        try {
-          const updated = await apiGet<DisbursementRequestDto>(API_ENDPOINTS.COST_DR, {
-            params: { drNumber },
-          });
-          setDr(updated);
-        } catch {
-          // ignore refresh error; main action already succeeded
-        }
-      } else {
-        setReuploadError(result.Message ?? "Failed to re-upload file");
-      }
+      const uploadedName = result.FileName || "attachment";
+      setReuploadSuccess(`Attachment uploaded successfully as ${uploadedName}.`);
+      setReuploadFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : "Failed to re-upload file";
+      const message = caught instanceof Error ? caught.message : "Failed to upload attachment";
       setReuploadError(message);
     } finally {
       setReuploadUploading(false);
@@ -220,6 +230,23 @@ function BorrowerDisbursementRequestPage() {
     }
   };
 
+  const handleDownloadAttachment = async () => {
+    if (drNumber == null || Number.isNaN(drNumber)) return;
+    setError(null);
+    setIsDownloadingAttachment(true);
+    try {
+      await downloadFile(API_ENDPOINTS.COST_DR_DOWNLOAD_ATTACHMENT, `dr_${drNumber}.zip`, {
+        params: { drNumber },
+      });
+    } catch (caught) {
+      const status = (caught as { response?: { status?: number } })?.response?.status;
+      const message = status === 404 ? "No attachment found" : caught instanceof Error ? caught.message : "Failed to download attachment";
+      setError(message);
+    } finally {
+      setIsDownloadingAttachment(false);
+    }
+  };
+
   if (!isBorrower) return null;
 
   return (
@@ -227,6 +254,17 @@ function BorrowerDisbursementRequestPage() {
       <div className="d-flex align-items-center justify-content-between mb-3">
         <h2 className="h5 mb-0">Your Disbursement Request</h2>
         <div className="d-flex gap-2">
+          {dr && (
+            <button
+              type="button"
+              className="btn btn-outline-primary btn-sm"
+              onClick={handleDownloadAttachment}
+              disabled={isDownloadingAttachment}
+              aria-label="Download DR attachment"
+            >
+              {isDownloadingAttachment ? "Downloading..." : "Download Attachment"}
+            </button>
+          )}
           <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/dashboard")}>
             Back to Dashboard
           </button>
@@ -284,25 +322,25 @@ function BorrowerDisbursementRequestPage() {
               </div>
               <p className="text-muted small mb-2">
                 {uploadSectionLocked
-                  ? "Submitted for approval. Use Recall to bring it back for edits or re-upload."
-                  : "Submit this disbursement request for approver review. If the DR has been rejected, you can re-upload the file (old file will be deleted)."}
+                  ? "Submitted for approval. Use Recall to bring it back for edits or upload a new attachment."
+                  : "Submit this disbursement request for approver review. If the DR has been rejected, you can upload or re-upload an attachment (previous attachment will be deleted)."}
               </p>
               <hr className="my-3" />
               <p className="text-muted small mb-2">
-                If the DR has been rejected, you can re-upload the file. The old file will be deleted and replaced with the new one.
+                If the DR has been rejected, you can upload or re-upload an attachment. The previous attachment will be deleted and replaced with the new one.
               </p>
               {reuploadError ? <div className="alert alert-danger mb-3">{reuploadError}</div> : null}
               {reuploadSuccess ? <div className="alert alert-success mb-3">{reuploadSuccess}</div> : null}
               <div className="mb-3">
                 <label htmlFor="borrower-dr-file" className="form-label">
-                  {isRejected ? "New file" : "Re-upload file (only when rejected)"}
+                  {isRejected ? "New attachment" : "Re-upload attachment (only when rejected)"}
                 </label>
                 <input
                   ref={fileInputRef}
                   type="file"
                   className="form-control"
                   id="borrower-dr-file"
-                  accept=".xlsx,.xls"
+                  accept=".zip,.rar"
                   onChange={handleFileChange}
                   disabled={reuploadUploading || uploadSectionLocked}
                 />
@@ -318,7 +356,7 @@ function BorrowerDisbursementRequestPage() {
                 onClick={handleReupload}
                 disabled={!reuploadFile || reuploadUploading || !isRejected || uploadSectionLocked}
               >
-                {reuploadUploading ? "Uploading..." : "Re-upload file"}
+                {reuploadUploading ? "Uploading..." : "Upload attachment"}
               </button>
               {uploadSectionLocked && (
                 <p className="text-muted small mt-2 mb-0">Submit and re-upload are locked while the DR is submitted for approval.</p>
@@ -352,27 +390,46 @@ function BorrowerDisbursementRequestPage() {
                           <th style={{ minWidth: "80px" }}>Payable amt</th>
                           <th style={{ minWidth: "100px" }}>Approved amt</th>
                           <th style={{ minWidth: "180px" }}>Audit remarks</th>
+                          <th style={{ minWidth: "180px" }}>Your remarks</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {(dr.Records as DisbursementRequestCostRecordDto[]).map((row) => (
-                          <tr key={row.RecordNumber}>
-                            <td>{row.RecordNumber}</td>
-                            <td className="cost-lines-cell-wrap">{row.Building ?? "—"}</td>
-                            <td className="cost-lines-cell-wrap">{row.Category ?? "—"}</td>
-                            <td className="cost-lines-cell-wrap">{row.SubCategory ?? "—"}</td>
-                            <td className="cost-lines-cell-wrap">{row.PartyName ?? "—"}</td>
-                            <td className="cost-lines-cell-wrap">{row.CostReason ?? "—"}</td>
-                            <td className="cost-lines-cell-wrap">
-                              {[row.DocumentType, row.DocumentNumber ? `#${row.DocumentNumber}` : ""].filter(Boolean).join(" ") || "—"}
-                            </td>
-                            <td>{(row.DocumentAmount ?? 0).toLocaleString()}</td>
-                            <td>{(row.TotalAmount ?? 0).toLocaleString()}</td>
-                            <td>{(row.PayableAmount ?? 0).toLocaleString()}</td>
-                            <td>{(row.ApprovedAmount ?? 0).toLocaleString()}</td>
-                            <td className="audit-remarks-cell">{row.AuditRemarks ?? "—"}</td>
-                          </tr>
-                        ))}
+                        {(dr.Records as DisbursementRequestCostRecordDto[]).map((row) => {
+                          const hasAuditRemarks = (row.AuditRemarks ?? "").trim() !== "";
+                          return (
+                            <tr key={row.RecordNumber}>
+                              <td>{row.RecordNumber}</td>
+                              <td className="cost-lines-cell-wrap">{row.Building ?? "—"}</td>
+                              <td className="cost-lines-cell-wrap">{row.Category ?? "—"}</td>
+                              <td className="cost-lines-cell-wrap">{row.SubCategory ?? "—"}</td>
+                              <td className="cost-lines-cell-wrap">{row.PartyName ?? "—"}</td>
+                              <td className="cost-lines-cell-wrap">{row.CostReason ?? "—"}</td>
+                              <td className="cost-lines-cell-wrap">
+                                {[row.DocumentType, row.DocumentNumber ? `#${row.DocumentNumber}` : ""].filter(Boolean).join(" ") || "—"}
+                              </td>
+                              <td>{(row.DocumentAmount ?? 0).toLocaleString()}</td>
+                              <td>{(row.TotalAmount ?? 0).toLocaleString()}</td>
+                              <td>{(row.PayableAmount ?? 0).toLocaleString()}</td>
+                              <td>{(row.ApprovedAmount ?? 0).toLocaleString()}</td>
+                              <td className="audit-remarks-cell">{row.AuditRemarks ?? "—"}</td>
+                              <td className="audit-remarks-cell">
+                                {hasAuditRemarks ? (
+                                  <textarea
+                                    rows={2}
+                                    className="form-control form-control-sm"
+                                    value={borrowerRemarksByRecord[row.RecordNumber] ?? ""}
+                                    onChange={(e) => setBorrowerRemarksByRecord((prev) => ({ ...prev, [row.RecordNumber]: e.target.value }))}
+                                    placeholder="Optional response to audit remarks"
+                                    aria-label={`Your remarks for row ${row.RecordNumber}`}
+                                    disabled={uploadSectionLocked}
+                                  />
+                                ) : (
+                                  (borrowerRemarksByRecord[row.RecordNumber] ?? row.Remarks ?? "—")
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
