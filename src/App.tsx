@@ -14,6 +14,7 @@ import ReviewSalesMisPage from "./pages/ReviewSalesMisPage";
 import AddDisbursementRequestPage from "./pages/AddDisbursementRequestPage";
 import ManageDisbursementRequestPage from "./pages/ManageDisbursementRequestPage";
 import BorrowerDisbursementRequestPage from "./pages/BorrowerDisbursementRequestPage";
+import DownloadSalesMisPage from "./pages/DownloadSalesMisPage";
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
         <Route path="pending-mis-excel" element={<PendingMisExcelGridPage />} />
         <Route path="upload-sales-mis" element={<UploadSalesMisPage />} />
         <Route path="review-sales-mis" element={<ReviewSalesMisPage />} />
+        <Route path="download-sales-mis" element={<DownloadSalesMisPage />} />
         <Route path="add-disbursement-request" element={<AddDisbursementRequestPage />} />
         <Route path="manage-disbursement-request/:drNumber" element={<ManageDisbursementRequestPage />} />
         <Route path="my-disbursement-request/:drNumber" element={<BorrowerDisbursementRequestPage />} />

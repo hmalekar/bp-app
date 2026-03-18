@@ -359,3 +359,7 @@ export interface DisbursementRequestDto {
   LatestWorkflowStatus?: string;
   Records: DisbursementRequestCostRecordDto[];
 }
+export interface ExistingSalesMisMonthDto {
+  YearMonth: number;
+  YearMonthString: string;
+}

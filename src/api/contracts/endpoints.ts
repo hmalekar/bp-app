@@ -23,6 +23,7 @@ export const API_ENDPOINTS = {
   COST_DR_DELETE: "/api/v1/cost/dr_delete",
   COST_DR_ATTACHMENT: "/api/v1/cost/dr_attachment",
   COST_DR_DOWNLOAD_ATTACHMENT: "/api/v1/cost/dr_download",
+  EXISTING_SALES_MIS_MONTHS: "/api/v1/sales/sales_mis_months",
 } as const;
 
 export type ApiEndpointGroup = keyof typeof API_ENDPOINTS;

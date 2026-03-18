@@ -85,6 +85,9 @@ function DashboardPage() {
     <div>
       <div className="d-flex align-items-center justify-content-between mb-2">
         <h2 className="h5 mb-0">Pending Sales MIS</h2>
+        <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => navigate("/download-sales-mis")}>
+          Download existing MIS
+        </button>
       </div>
 
       {error ? <div className="alert alert-danger">{error}</div> : null}

@@ -533,11 +533,8 @@ function UploadSalesMisPage() {
 
   return (
     <div className="d-flex flex-column gap-4">
-      {/* Sub-header: back link left, Recall + Submit right */}
-      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => navigate("/dashboard")}>
-          ← Back to dashboard
-        </button>
+      {/* Sub-header: actions + back link right */}
+      <div className="d-flex flex-wrap justify-content-end align-items-center gap-2">
         <div className="d-flex gap-2">
           {showRecallButton && (
             <button type="button" className="btn btn-warning btn-sm" onClick={handleRecall} disabled={isRecalling || isPendingUpload}>
@@ -553,6 +550,9 @@ function UploadSalesMisPage() {
             {isSubmitting ? "Submitting..." : "Submit for Approval"}
           </button>
         </div>
+        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/dashboard")}>
+          ← Back to dashboard
+        </button>
       </div>
 
       {/* Page title card – Upload Sales MIS with project details and status */}

@@ -192,8 +192,8 @@ function ReviewSalesMisPage() {
 
   return (
     <div className="d-flex flex-column gap-4">
-      <div>
-        <button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => navigate("/dashboard")}>
+      <div className="d-flex justify-content-end">
+        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/dashboard")}>
           ← Back to dashboard
         </button>
       </div>

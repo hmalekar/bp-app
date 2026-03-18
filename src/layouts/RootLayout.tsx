@@ -20,6 +20,7 @@ const PATH_PAGE_NAMES: Record<string, string> = {
   "/pending-mis-excel": "Pending MIS Excel",
   "/upload-sales-mis": "Upload Sales MIS",
   "/review-sales-mis": "Review Sales MIS",
+  "/download-sales-mis": "Download Sales MIS",
   "/add-disbursement-request": "Add Disbursement Request",
   "/manage-disbursement-request": "Manage Disbursement Request",
 };
