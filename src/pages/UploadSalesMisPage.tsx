@@ -245,7 +245,7 @@ function UploadSalesMisPage() {
     if (soldUnits === null) {
       setSoldUnitsLoading(true);
       try {
-        const yearMonth = displayRecord.NewDueMonth;
+        const yearMonth = displayRecord.LastSubmittedMonth;
         const projectNumber = displayRecord.ProjectNumber;
         const list = await apiGet<SoldUnitRecordDto[]>(API_ENDPOINTS.SALES_SOLD_UNITS, {
           params: { YearMonth: yearMonth, ProjectNumber: projectNumber },

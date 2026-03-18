@@ -1,5 +1,15 @@
+import { useEffect } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { clearAuthToken, clearCurrentUser, clearUserRole, getCurrentUser, getUserRole } from "../api/http";
+import {
+  clearAuthToken,
+  clearCurrentUser,
+  clearUserRole,
+  getAuthToken,
+  getCurrentUser,
+  getUserRole,
+  LOGIN_PATH,
+  SESSION_EXPIRED_QUERY,
+} from "../api/http";
 
 const PATH_PAGE_NAMES: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -21,6 +31,22 @@ function RootLayout() {
   const { pathname } = useLocation();
   const pageName = PATH_PAGE_NAMES[pathname] ?? (pathname.startsWith("/manage-disbursement-request") ? "Manage Disbursement Request" : "");
 
+  useEffect(() => {
+    // sessionStorage clears on browser close; if a token remains in localStorage we treat it as an expired session
+    const token = getAuthToken();
+    const hasStaleSession = Boolean(token) && !currentUser;
+    const isUnauthed = !token || !currentUser;
+
+    if (!isUnauthed) return;
+
+    clearAuthToken();
+    clearCurrentUser();
+    clearUserRole();
+
+    const loginUrl = hasStaleSession ? `${LOGIN_PATH}?${SESSION_EXPIRED_QUERY}` : LOGIN_PATH;
+    navigate(loginUrl, { replace: true });
+  }, [currentUser, navigate, pathname]);
+
   const handleLogout = () => {
     clearAuthToken();
     clearCurrentUser();
@@ -32,8 +58,9 @@ function RootLayout() {
     <div className="root-layout d-flex flex-column">
       <nav className="navbar navbar-expand-lg navbar-dark bg-primary">
         <div className="container-fluid">
-          <NavLink className="navbar-brand" to="/">
-            Borrower Portal
+          <NavLink className="navbar-brand d-flex align-items-center gap-2" to="/">
+            <img src="/brand.png" alt="Arbour" style={{ height: "28px" }} />
+            <span>Developer Portal</span>
           </NavLink>
           {pageName ? <span className="navbar-text text-light text-opacity-90 d-none d-md-inline">{pageName}</span> : null}
           <button

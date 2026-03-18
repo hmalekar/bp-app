@@ -124,7 +124,11 @@ function DashboardPage() {
                     </td>
                     <td>{record.LastMisMonth}</td>
                     <td>{record.NewDueMonthV ?? record.NewDueMonth}</td>
-                    <td>{record.LatestWorkflowUser?.trim() + " (" + record.LatestWorkflowUserRole?.trim() + ")" || "—"}</td>
+                    <td>
+                      {record.LatestWorkflowUser?.trim()
+                        ? `${record.LatestWorkflowUser.trim()} (${record.LatestWorkflowUserRole?.trim() || "—"})`
+                        : "—"}
+                    </td>
                     <td>
                       <span className={`badge ${getSalesMisStatusBadgeClass(record.LatestWorkflowStatus)}`}>
                         {record.LatestWorkflowStatus || "—"}
