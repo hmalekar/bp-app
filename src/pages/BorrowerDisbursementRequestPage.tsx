@@ -24,7 +24,6 @@ function BorrowerDisbursementRequestPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [borrowerRemarks, setBorrowerRemarks] = useState("");
   const [reuploadFile, setReuploadFile] = useState<File | null>(null);
   const [reuploadUploading, setReuploadUploading] = useState(false);
   const [reuploadError, setReuploadError] = useState<string | null>(null);
@@ -63,7 +62,6 @@ function BorrowerDisbursementRequestPage() {
         });
         if (!isMounted) return;
         setDr(data);
-        setBorrowerRemarks(data.Remarks ?? "");
       } catch (caught) {
         const message = caught instanceof Error ? caught.message : "Failed to load disbursement request";
         if (isMounted) setError(message);
