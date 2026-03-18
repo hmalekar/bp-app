@@ -14,7 +14,7 @@ import type {
 
 const formatMonthLabel = (record: PendingSalesMisRecordDto) => record.NewDueMonthV ?? `${record.NewDueMonth}`;
 
-const formatNumber = (n: number) => (n === 0 ? "0" : n.toLocaleString());
+const formatNumber = (n: number) => (n === 0 ? "0" : n.toLocaleString("en-IN"));
 
 /** Extract error message from caught error; prefer ValidationResponse.Message from API if present. */
 function getWorkflowErrorMessage(caught: unknown, fallback: string): string {
