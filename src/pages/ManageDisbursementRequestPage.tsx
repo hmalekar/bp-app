@@ -62,7 +62,7 @@ function ManageDisbursementRequestPage() {
 
   useEffect(() => {
     if (isBorrower) {
-      navigate("/dashboard", { replace: true });
+      navigate("/pending-workflow", { replace: true });
       return;
     }
   }, [isBorrower, navigate]);
@@ -171,7 +171,7 @@ function ManageDisbursementRequestPage() {
       };
       const result = await apiPost<ValidationResponse>(API_ENDPOINTS.COST_DR_WORKFLOW_UPDATE, payload);
       if (result.IsValid) {
-        navigate("/dashboard", { replace: true });
+        navigate("/pending-workflow", { replace: true });
       } else {
         setError(result.Message ?? "Failed to approve");
       }
@@ -243,7 +243,7 @@ function ManageDisbursementRequestPage() {
       };
       const result = await apiPost<ValidationResponse>(API_ENDPOINTS.COST_DR_WORKFLOW_UPDATE, payload);
       if (result.IsValid) {
-        navigate("/dashboard", { replace: true });
+        navigate("/pending-workflow", { replace: true });
       } else {
         setError(result.Message ?? "Failed to reject");
       }
@@ -364,8 +364,8 @@ function ManageDisbursementRequestPage() {
               {isExporting ? "Downloading..." : "Export Excel"}
             </button>
           )}
-          <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/dashboard")}>
-            Back to Dashboard
+          <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/pending-workflow")}>
+            Back to Pending Workflow
           </button>
         </div>
       </div>

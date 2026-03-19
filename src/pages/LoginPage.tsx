@@ -28,7 +28,7 @@ function LoginPage() {
       const response = await apiPost<LoginResponse, LoginRequest>(API_ENDPOINTS.LOGIN, payload);
       setUserRole(response.Role ?? "");
       setCurrentUser(response.Email ?? "");
-      navigate("/dashboard", { replace: true });
+      navigate("/pending-workflow", { replace: true });
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Login failed";
       setError(message);

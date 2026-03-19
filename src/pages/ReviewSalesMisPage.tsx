@@ -136,7 +136,7 @@ function ReviewSalesMisPage() {
         setError(response.Message || "Failed to approve");
         return;
       }
-      navigate("/dashboard", { replace: true });
+      navigate("/pending-workflow", { replace: true });
     } catch (caught) {
       setError(getWorkflowErrorMessage(caught, "Failed to approve"));
     } finally {
@@ -165,7 +165,7 @@ function ReviewSalesMisPage() {
         setError(response.Message || "Failed to reject");
         return;
       }
-      navigate("/dashboard", { replace: true });
+      navigate("/pending-workflow", { replace: true });
     } catch (caught) {
       setError(getWorkflowErrorMessage(caught, "Failed to reject"));
     } finally {
@@ -182,8 +182,8 @@ function ReviewSalesMisPage() {
         <div className="card-body">
           <h2 className="h5 mb-2">Review Sales MIS</h2>
           <p className="text-muted">This page is for approvers only. Borrowers cannot review MIS here.</p>
-          <button className="btn btn-primary" onClick={() => navigate("/dashboard")}>
-            Back to dashboard
+          <button className="btn btn-primary" onClick={() => navigate("/pending-workflow")}>
+            Back to Pending Workflow
           </button>
         </div>
       </div>
@@ -196,8 +196,8 @@ function ReviewSalesMisPage() {
         <div className="card-body">
           <h2 className="h5 mb-2">Review Sales MIS</h2>
           <p className="text-muted">No pending MIS record was provided.</p>
-          <button className="btn btn-primary" onClick={() => navigate("/dashboard")}>
-            Back to dashboard
+          <button className="btn btn-primary" onClick={() => navigate("/pending-workflow")}>
+            Back to Pending Workflow
           </button>
         </div>
       </div>
@@ -215,8 +215,8 @@ function ReviewSalesMisPage() {
   return (
     <div className="d-flex flex-column gap-4">
       <div className="d-flex justify-content-end">
-        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/dashboard")}>
-          ← Back to dashboard
+        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/pending-workflow")}>
+          ← Back to Pending Workflow
         </button>
       </div>
 

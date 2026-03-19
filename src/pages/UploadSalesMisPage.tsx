@@ -575,8 +575,8 @@ function UploadSalesMisPage() {
         <div className="card-body">
           <h2 className="h5 mb-2">Upload Sales MIS</h2>
           <p className="text-muted">No pending MIS record was provided.</p>
-          <button className="btn btn-primary" onClick={() => navigate("/dashboard")}>
-            Back to dashboard
+          <button className="btn btn-primary" onClick={() => navigate("/pending-workflow")}>
+            Back to Pending Workflow
           </button>
         </div>
       </div>
@@ -604,8 +604,8 @@ function UploadSalesMisPage() {
             {isSubmitting ? "Submitting..." : "Submit for Approval"}
           </button>
         </div>
-        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/dashboard")}>
-          ← Back to dashboard
+        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/pending-workflow")}>
+          ← Back to Pending Workflow
         </button>
       </div>
 

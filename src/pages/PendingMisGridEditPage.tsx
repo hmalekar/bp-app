@@ -106,8 +106,8 @@ function PendingMisGridEditPage() {
         <div className="card-body">
           <h2 className="h5 mb-2">Pending MIS Grid</h2>
           <p className="text-muted">No pending MIS record was provided.</p>
-          <button className="btn btn-primary" onClick={() => navigate("/dashboard")}>
-            Back to dashboard
+          <button className="btn btn-primary" onClick={() => navigate("/pending-workflow")}>
+            Back to Pending Workflow
           </button>
         </div>
       </div>

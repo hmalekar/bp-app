@@ -22,7 +22,8 @@ function App() {
       <Route element={<RootLayout />}>
         <Route index element={<Navigate to="/login" replace />} />
         <Route path="about" element={<AboutPage />} />
-        <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="pending-workflow" element={<DashboardPage />} />
+        <Route path="dashboard" element={<Navigate to="/pending-workflow" replace />} />
         <Route path="pending-mis" element={<PendingMisDetailPage />} />
         <Route path="pending-mis-table" element={<PendingMisTableDrawerPage />} />
         <Route path="pending-mis-grid" element={<PendingMisGridEditPage />} />

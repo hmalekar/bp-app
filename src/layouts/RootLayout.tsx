@@ -12,7 +12,7 @@ import {
 } from "../api/http";
 
 const PATH_PAGE_NAMES: Record<string, string> = {
-  "/dashboard": "Dashboard",
+  "/pending-workflow": "Pending Workflow",
   "/about": "About",
   "/pending-mis": "Pending MIS",
   "/pending-mis-table": "Pending MIS Table",

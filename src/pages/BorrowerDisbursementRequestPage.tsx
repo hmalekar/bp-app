@@ -39,7 +39,7 @@ function BorrowerDisbursementRequestPage() {
 
   useEffect(() => {
     if (!isBorrower) {
-      navigate("/dashboard", { replace: true });
+      navigate("/pending-workflow", { replace: true });
     }
   }, [isBorrower, navigate]);
 
@@ -219,7 +219,7 @@ function BorrowerDisbursementRequestPage() {
       if (result.IsValid) {
         const message = result.Message?.trim() || "Disbursement request deleted successfully.";
         alert(message);
-        navigate("/dashboard", { replace: true });
+        navigate("/pending-workflow", { replace: true });
       } else {
         setError(result.Message ?? "Failed to delete disbursement request");
       }
@@ -266,8 +266,8 @@ function BorrowerDisbursementRequestPage() {
               {isDownloadingAttachment ? "Downloading..." : "Download Attachment"}
             </button>
           )}
-          <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/dashboard")}>
-            Back to Dashboard
+          <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/pending-workflow")}>
+            Back to Pending Workflow
           </button>
           <button type="button" className="btn btn-outline-danger btn-sm" onClick={handleDelete} disabled={deleteInProgress}>
             {deleteInProgress ? "Deleting..." : "Delete DR"}

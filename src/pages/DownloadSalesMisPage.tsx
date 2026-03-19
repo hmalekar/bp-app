@@ -55,9 +55,7 @@ function DownloadSalesMisPage() {
         const next: Record<number, MonthsState> = { ...prev };
         for (const p of projects) {
           const existing = next[p.ProjectNumber];
-          next[p.ProjectNumber] = existing?.status === "loaded"
-            ? existing
-            : { status: "loading", months: existing?.months ?? [], error: null };
+          next[p.ProjectNumber] = existing?.status === "loaded" ? existing : { status: "loading", months: existing?.months ?? [], error: null };
         }
         return next;
       });
@@ -91,7 +89,7 @@ function DownloadSalesMisPage() {
               [p.ProjectNumber]: { status: "error", months: prev[p.ProjectNumber]?.months ?? [], error: message },
             }));
           }
-        })
+        }),
       );
     };
 
@@ -141,8 +139,8 @@ function DownloadSalesMisPage() {
           <h2 className="h5 mb-1">Download Sales MIS</h2>
           <div className="text-muted small">Download any previously uploaded Sales MIS for your accessible projects.</div>
         </div>
-        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/dashboard")}>
-          ← Back to dashboard
+        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/pending-workflow")}>
+          ← Back to Pending Workflow
         </button>
       </div>
 
@@ -181,7 +179,7 @@ function DownloadSalesMisPage() {
                     projects.map((p) => {
                       const state = monthsByProject[p.ProjectNumber];
                       const months = state?.months ?? [];
-                      const selected = selectedYearMonthByProject[p.ProjectNumber] ?? (months[0]?.YearMonth ?? 0);
+                      const selected = selectedYearMonthByProject[p.ProjectNumber] ?? months[0]?.YearMonth ?? 0;
                       const isDownloading = Boolean(downloadingByProject[p.ProjectNumber]);
                       const isDisabled = months.length === 0 || state?.status === "loading" || isDownloading;
 
@@ -232,4 +230,3 @@ function DownloadSalesMisPage() {
 }
 
 export default DownloadSalesMisPage;
-

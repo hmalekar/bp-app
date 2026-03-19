@@ -159,7 +159,7 @@ function AddDisbursementRequestPage() {
       if (result.IsValid) {
         const message = result.Message && result.Message.trim().length > 0 ? result.Message : "Disbursement request deleted successfully.";
         alert(message);
-        navigate("/dashboard");
+        navigate("/pending-workflow");
       } else {
         setWorkflowError(result.Message ?? "Delete failed.");
       }
@@ -239,8 +239,8 @@ function AddDisbursementRequestPage() {
     <div>
       <div className="d-flex align-items-center justify-content-between mb-3">
         <h2 className="h5 mb-0">Add Disbursement Request</h2>
-        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/dashboard")}>
-          Back to Dashboard
+        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/pending-workflow")}>
+          Back to Pending Workflow
         </button>
       </div>
 
