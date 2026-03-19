@@ -182,6 +182,12 @@ function UploadSalesMisPage() {
   const [isRecalling, setIsRecalling] = useState(false);
   const [importResult, setImportResult] = useState<SalesMisImportResult | null>(null);
 
+  // Attachment upload state
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentUploading, setAttachmentUploading] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [attachmentSuccess, setAttachmentSuccess] = useState<string | null>(null);
+
   // Cancellation section: sold units (fetched on first "Add" click) and rows
   const [soldUnits, setSoldUnits] = useState<SoldUnitRecordDto[] | null>(null);
   const [soldUnitsLoading, setSoldUnitsLoading] = useState(false);
@@ -207,6 +213,9 @@ function UploadSalesMisPage() {
 
   // Show recall button if status is not approved or rejected
   const showRecallButton = !isApproved && !isRejected;
+
+  // Attachment upload follows editable MIS states (same as MIS upload section)
+  const isAttachmentUploadEnabled = isUploadEnabled;
 
   const displayRecord = record ?? resolvedRecord;
 
@@ -401,11 +410,55 @@ function UploadSalesMisPage() {
           Commentary: err.Commentary || "",
         })),
       });
+      if (result.Success) {
+        setRecord((prev) => (prev ? { ...prev, LatestWorkflowStatus: "Pending Submission for Approval" } : null));
+      }
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Failed to import MIS file";
       setError(message);
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  const handleAttachmentFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    setAttachmentFile(file);
+    setAttachmentError(null);
+    setAttachmentSuccess(null);
+  };
+
+  const handleUploadAttachment = async () => {
+    if (!displayRecord || !attachmentFile || attachmentUploading || !isAttachmentUploadEnabled) return;
+
+    const name = attachmentFile.name ?? "";
+    const isZipOrRar = /\.(zip|rar)$/i.test(name);
+    if (!isZipOrRar) {
+      setAttachmentError("Only .zip and .rar files are allowed for attachments.");
+      return;
+    }
+
+    setAttachmentError(null);
+    setAttachmentSuccess(null);
+    setAttachmentUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", attachmentFile);
+      const url = `${API_ENDPOINTS.SALES_MIS_ATTACHMENT}?YearMonth=${encodeURIComponent(
+        displayRecord.NewDueMonth,
+      )}&ProjectNumber=${encodeURIComponent(displayRecord.ProjectNumber)}`;
+      await apiPost<{ FileName?: string; Path?: string }>(url, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      setAttachmentSuccess("Attachment uploaded successfully.");
+      setAttachmentFile(null);
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Failed to upload attachment";
+      setAttachmentError(message);
+    } finally {
+      setAttachmentUploading(false);
     }
   };
 
@@ -418,6 +471,7 @@ function UploadSalesMisPage() {
       await apiPost<void, SalesMisRowError[]>(API_ENDPOINTS.SALES_MIS_UPDATE_COMMENTARY, warningRows);
       setError(null);
       setSuccessMessage("Commentary updated successfully.");
+      setRecord((prev) => (prev ? { ...prev, LatestWorkflowStatus: "Pending Submission for Approval" } : null));
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Failed to update commentary";
       setError(message);
@@ -545,7 +599,7 @@ function UploadSalesMisPage() {
             type="button"
             className="btn btn-success btn-sm"
             onClick={handleSubmitForApproval}
-            disabled={isSubmittedForApproval || isSubmitting || isPendingUpload}
+            disabled={isSubmittedForApproval || isSubmitting}
           >
             {isSubmitting ? "Submitting..." : "Submit for Approval"}
           </button>
@@ -801,6 +855,57 @@ function UploadSalesMisPage() {
           </div>
           <button className="btn btn-success" onClick={handleImport} disabled={!selectedFile || isImporting || !isUploadEnabled}>
             {isImporting ? "Importing..." : "Import MIS"}
+          </button>
+        </div>
+      </div>
+
+      {/* Attachment upload card */}
+      <div className="card shadow-sm border-0">
+        <div className="card-body">
+          <h3 className="h6 mb-3">Upload attachment</h3>
+          <p className="text-muted small mb-2">
+            Upload supporting documents for this Sales MIS as a compressed file (.zip or .rar). This works similarly to the Cost DR attachment.
+          </p>
+          {!isAttachmentUploadEnabled && (
+            <div className="alert alert-info mb-3">
+              Attachment upload is disabled for the current status. Current status: <strong>{currentStatus}</strong>
+            </div>
+          )}
+          {attachmentError && (
+            <div className="alert alert-danger mb-3" role="alert">
+              {attachmentError}
+            </div>
+          )}
+          {attachmentSuccess && (
+            <div className="alert alert-success mb-3" role="alert">
+              {attachmentSuccess}
+            </div>
+          )}
+          <div className="mb-3">
+            <label htmlFor="sales-mis-attachment" className="form-label">
+              Attachment file (.zip, .rar)
+            </label>
+            <input
+              type="file"
+              className="form-control"
+              id="sales-mis-attachment"
+              accept=".zip,.rar"
+              onChange={handleAttachmentFileChange}
+              disabled={attachmentUploading || !isAttachmentUploadEnabled}
+            />
+            {attachmentFile && (
+              <div className="form-text mt-1">
+                Selected: {attachmentFile.name} ({(attachmentFile.size / 1024).toFixed(2)} KB)
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            className="btn btn-outline-primary"
+            onClick={handleUploadAttachment}
+            disabled={!attachmentFile || attachmentUploading || !isAttachmentUploadEnabled}
+          >
+            {attachmentUploading ? "Uploading..." : "Upload attachment"}
           </button>
         </div>
       </div>

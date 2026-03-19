@@ -44,6 +44,7 @@ function ReviewSalesMisPage() {
 
   const [error, setError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isDownloadingAttachment, setIsDownloadingAttachment] = useState(false);
   const [comparison, setComparison] = useState<SalesMisComparisonResultDto | null>(null);
   const [isLoadingComparison, setIsLoadingComparison] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
@@ -95,6 +96,27 @@ function ReviewSalesMisPage() {
       setError(message);
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handleDownloadAttachment = async () => {
+    if (!resolvedRecord) return;
+    setError(null);
+    setIsDownloadingAttachment(true);
+    try {
+      const monthLabel = formatMonthLabel(resolvedRecord).replace(/[\s/]+/g, "-");
+      const fileName = `sales-mis-attachment-${resolvedRecord.ProjectNumber}-${monthLabel}`;
+      await downloadFile(API_ENDPOINTS.SALES_MIS_ATTACHMENT_DOWNLOAD, fileName, {
+        params: {
+          yearMonth: resolvedRecord.NewDueMonth,
+          projectNumber: resolvedRecord.ProjectNumber,
+        },
+      });
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Failed to download attachment";
+      setError(message);
+    } finally {
+      setIsDownloadingAttachment(false);
     }
   };
 
@@ -227,9 +249,19 @@ function ReviewSalesMisPage() {
         <div className="card-body">
           <p className="mb-3">Download the MIS Excel for the selected project and month, then upload it back once reviewed.</p>
           {error ? <div className="alert alert-danger mb-3">{error}</div> : null}
-          <button className="btn btn-primary" onClick={handleDownload} disabled={isDownloading || buttonsLocked}>
-            {isDownloading ? "Downloading..." : "Download MIS Excel"}
-          </button>
+          <div className="d-flex flex-wrap gap-2">
+            <button className="btn btn-primary" onClick={handleDownload} disabled={isDownloading || buttonsLocked}>
+              {isDownloading ? "Downloading..." : "Download MIS Excel"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-primary"
+              onClick={handleDownloadAttachment}
+              disabled={isDownloadingAttachment || buttonsLocked}
+            >
+              {isDownloadingAttachment ? "Downloading..." : "Download Attachment"}
+            </button>
+          </div>
         </div>
       </div>
 
