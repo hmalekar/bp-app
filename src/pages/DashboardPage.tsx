@@ -81,6 +81,11 @@ function DashboardPage() {
     navigate(path, { state: record });
   };
 
+  const isReviewLocked = (status?: string | null) => {
+    const normalizedStatus = status?.trim() ?? "";
+    return normalizedStatus === "Pending Upload" || normalizedStatus === "Pending Submission for Approval";
+  };
+
   return (
     <div>
       <div className="d-flex align-items-center justify-content-between mb-2">
@@ -143,7 +148,12 @@ function DashboardPage() {
                           Upload Sales MIS
                         </button>
                       ) : (
-                        <button type="button" className="btn btn-sm btn-primary" onClick={() => handleNavigate(record, "/review-sales-mis")}>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          onClick={() => handleNavigate(record, "/review-sales-mis")}
+                          disabled={isReviewLocked(record.LatestWorkflowStatus)}
+                        >
                           Review MIS
                         </button>
                       )}
