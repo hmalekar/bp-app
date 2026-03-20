@@ -15,6 +15,7 @@ import AddDisbursementRequestPage from "./pages/AddDisbursementRequestPage";
 import ManageDisbursementRequestPage from "./pages/ManageDisbursementRequestPage";
 import BorrowerDisbursementRequestPage from "./pages/BorrowerDisbursementRequestPage";
 import DownloadSalesMisPage from "./pages/DownloadSalesMisPage";
+import ApprovedDisbursementRequestsPage from "./pages/ApprovedDisbursementRequestsPage";
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
         <Route path="add-disbursement-request" element={<AddDisbursementRequestPage />} />
         <Route path="manage-disbursement-request/:drNumber" element={<ManageDisbursementRequestPage />} />
         <Route path="my-disbursement-request/:drNumber" element={<BorrowerDisbursementRequestPage />} />
+        <Route path="approved-disbursement-requests" element={<ApprovedDisbursementRequestsPage />} />
       </Route>
       <Route element={<AuthLayout />}>
         <Route path="login" element={<LoginPage />} />

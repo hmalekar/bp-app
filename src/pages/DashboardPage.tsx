@@ -170,11 +170,20 @@ function DashboardPage() {
       <div className="mt-5">
         <div className="d-flex align-items-center justify-content-between mb-2">
           <h2 className="h5 mb-0">Pending Disbursement Requests</h2>
-          {isBorrower ? (
-            <button type="button" className="btn btn-primary" onClick={() => navigate("/add-disbursement-request")}>
-              Add
+          <div className="d-flex gap-2">
+            {isBorrower ? (
+              <button type="button" className="btn btn-primary" onClick={() => navigate("/add-disbursement-request")}>
+                Add
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="btn btn-outline-primary"
+              onClick={() => navigate("/approved-disbursement-requests")}
+            >
+              Approved DRs
             </button>
-          ) : null}
+          </div>
         </div>
 
         {pendingDrError ? <div className="alert alert-danger">{pendingDrError}</div> : null}

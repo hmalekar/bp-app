@@ -363,3 +363,12 @@ export interface ExistingSalesMisMonthDto {
   YearMonth: number;
   YearMonthString: string;
 }
+export interface ApprovedDisbursementRequestDto {
+  DrNumber: number;
+  ProjectNumber: number;
+  ProjectName: string;
+  YearMonth: number;
+  Remarks: string;
+  PayableAmount: number;
+  ApprovedAmount: number;
+}

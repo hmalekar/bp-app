@@ -23,6 +23,7 @@ const PATH_PAGE_NAMES: Record<string, string> = {
   "/download-sales-mis": "Download Sales MIS",
   "/add-disbursement-request": "Add Disbursement Request",
   "/manage-disbursement-request": "Manage Disbursement Request",
+  "/approved-disbursement-requests": "Approved Disbursement Requests",
 };
 
 function RootLayout() {
