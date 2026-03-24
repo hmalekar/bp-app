@@ -24,6 +24,8 @@ const PATH_PAGE_NAMES: Record<string, string> = {
   "/add-disbursement-request": "Add Disbursement Request",
   "/manage-disbursement-request": "Manage Disbursement Request",
   "/approved-disbursement-requests": "Approved Disbursement Requests",
+  "/request-noc": "Request for NOC",
+  "/review-noc": "Review NOC Records",
 };
 
 function RootLayout() {

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiGet } from "../api/client";
 import { getUserRole } from "../api/http";
 import { API_ENDPOINTS } from "../api/contracts/endpoints";
-import type { PendingSalesMisRecordDto, PendingDisbursementRequestDto } from "../api/contracts/types";
+import type { PendingSalesMisRecordDto, PendingDisbursementRequestDto, PendingNocRequestDto } from "../api/contracts/types";
 import { getSalesMisStatusBadgeClass } from "../constants/salesMisWorkflowStatus";
 
 function DashboardPage() {
@@ -13,6 +13,9 @@ function DashboardPage() {
   const [pendingDr, setPendingDr] = useState<PendingDisbursementRequestDto[]>([]);
   const [pendingDrError, setPendingDrError] = useState<string | null>(null);
   const [pendingDrLoading, setPendingDrLoading] = useState(true);
+  const [pendingNocRequests, setPendingNocRequests] = useState<PendingNocRequestDto[]>([]);
+  const [pendingNocError, setPendingNocError] = useState<string | null>(null);
+  const [pendingNocLoading, setPendingNocLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -38,6 +41,35 @@ function DashboardPage() {
     };
 
     fetchPendingMis();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchPendingNocRequests = async () => {
+      setPendingNocError(null);
+      try {
+        const data = await apiGet<PendingNocRequestDto[]>(API_ENDPOINTS.NOC_PENDING_REQUESTS);
+        if (isMounted) {
+          setPendingNocRequests(data ?? []);
+        }
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : "Failed to load pending NOC requests";
+        if (isMounted) {
+          setPendingNocError(message);
+        }
+      } finally {
+        if (isMounted) {
+          setPendingNocLoading(false);
+        }
+      }
+    };
+
+    fetchPendingNocRequests();
 
     return () => {
       isMounted = false;
@@ -84,6 +116,12 @@ function DashboardPage() {
   const isReviewLocked = (status?: string | null) => {
     const normalizedStatus = status?.trim() ?? "";
     return normalizedStatus === "Pending Upload" || normalizedStatus === "Pending Submission for Approval";
+  };
+
+  const formatMoney = (value: number | null | undefined) => {
+    const n = typeof value === "number" ? value : null;
+    if (n == null || Number.isNaN(n)) return "—";
+    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   return (
@@ -254,6 +292,92 @@ function DashboardPage() {
                             Action
                           </button>
                         )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Pending NOC Requests */}
+      <div className="mt-5">
+        <div className="d-flex align-items-center justify-content-between mb-2">
+          <h2 className="h5 mb-0">Pending NOC Requests</h2>
+          {isBorrower ? (
+            <button type="button" className="btn btn-primary" onClick={() => navigate("/request-noc")}>
+              Request for NOC
+            </button>
+          ) : null}
+        </div>
+
+        {pendingNocError ? <div className="alert alert-danger">{pendingNocError}</div> : null}
+
+        {pendingNocLoading ? (
+          <div className="text-muted">Loading pending NOC requests...</div>
+        ) : (
+          <div className="table-responsive">
+            <table className="table table-hover align-middle">
+              <thead className="table-light">
+                <tr>
+                  <th scope="col">Project</th>
+                  <th scope="col">Unit</th>
+                  <th scope="col">Customer</th>
+                  <th scope="col">Sales Total</th>
+                  <th scope="col">MSP Variance</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Last Action By</th>
+                  <th scope="col">Remarks</th>
+                  <th scope="col">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingNocRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="text-center text-muted py-4">
+                      No pending NOC requests.
+                    </td>
+                  </tr>
+                ) : (
+                  pendingNocRequests.map((noc) => (
+                    <tr key={`${noc.UnitUniqueNumber}-${noc.YearMonth}-${noc.NocNumber ?? ""}`}>
+                      <td>
+                        <div>{noc.ProjectName}</div>
+                        <div className="text-muted small">{noc.ProjecNumber}</div>
+                      </td>
+                      <td>
+                        <div>{noc.UnitNumber || "—"}</div>
+                        <div className="text-muted small">
+                          {noc.Phase || "—"} / {noc.Building || "—"} / {noc.Floor || "—"}
+                        </div>
+                      </td>
+                      <td>
+                        <div>{noc.CustomerName || "—"}</div>
+                        <div className="text-muted small">{noc.CustomerKycMobile || noc.CustomerKycEmail || "—"}</div>
+                      </td>
+                      <td>{formatMoney(noc.SalesTotalAmount)}</td>
+                      <td>
+                        <span className={`badge ${noc.MspVarianceAmount < 0 ? "text-bg-danger" : "text-bg-success"}`}>
+                          {formatMoney(noc.MspVarianceAmount)}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`badge ${getSalesMisStatusBadgeClass(noc.LatestWorkflowStatus)}`}>
+                          {noc.LatestWorkflowStatus || "—"}
+                        </span>
+                      </td>
+                      <td>
+                        {noc.LatestWorkflowUser?.trim()
+                          ? `${noc.LatestWorkflowUser.trim()} (${noc.LatestWorkflowUserRole?.trim() || "—"})`
+                          : "—"}
+                      </td>
+                      <td>{noc.Remarks || noc.LatestWorkflowComments || "—"}</td>
+                      <td>
+                        <button type="button" className="btn btn-sm btn-primary" onClick={() => navigate("/review-noc")}>
+                          Review NOC
+                        </button>
                       </td>
                     </tr>
                   ))

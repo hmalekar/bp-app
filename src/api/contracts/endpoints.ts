@@ -27,6 +27,11 @@ export const API_ENDPOINTS = {
   EXISTING_SALES_MIS_MONTHS: "/api/v1/sales/sales_mis_months",
   SALES_MIS_ATTACHMENT: "/api/v1/sales/mis_attachment",
   SALES_MIS_ATTACHMENT_DOWNLOAD: "/api/v1/sales/mis_attachment_download",
+  NOC_PENDING_REQUESTS: "/api/v1/sales/pending_noc_requests",
+  NOC_APPLICABLE_UNITS: "/api/v1/sales/applicable_noc_units",
+  NOC_WORKFLOW_UPDATE: "/api/v1/sales/noc_workflow_update",
+  NOC_ATTACHMENT: "/api/v1/sales/noc_attachment",
+  NOC_DOWNLOAD_ATTACHMENT: "/api/v1/sales/noc_attachment_download",
 } as const;
 
 export type ApiEndpointGroup = keyof typeof API_ENDPOINTS;

@@ -372,3 +372,74 @@ export interface ApprovedDisbursementRequestDto {
   PayableAmount: number;
   ApprovedAmount: number;
 }
+export interface PendingNocRequestDto {
+  YearMonth: number;
+  ProjecNumber: number;
+  ProjectName: string;
+  AssetNumber: number;
+  UnitUniqueNumber: number;
+  Phase: string;
+  Building: string;
+  Floor: string;
+  UnitNumber: string;
+  UniConfiguration: string;
+  UnitType: string;
+  Area: number;
+  CustomerName: string;
+  CustomerKycAadhaarNumber: number | null;
+  CustomerKycPan: string;
+  CustomerKycMobile: string;
+  CustomerKycEmail: string;
+  CustomerKycAddress: string;
+  SalesBasePrice: number;
+  SalesStampDutyAmount: number;
+  SalesRegistrationAmount: number;
+  SalesOtherChargesAmount: number;
+  SalesPassThroughCharges: number;
+  SalesTaxesAmount: number;
+  SalesTotalAmount: number;
+  MspVarianceAmount: number;
+  NocNumber: string;
+  ApprovalFlag: string;
+  LatestWorkflowUser: string;
+  LatestWorkflowStatus: string;
+  LatestWorkflowComments: string;
+  LatestWorkflowUserRole: string;
+  NextApprovalUserRole: string;
+  Remarks: string;
+  AttachmentFileName: string;
+}
+export interface UnitApplicableForNocDto {
+  YearMonth: number;
+  AssetNumber: number;
+  Phase: string;
+  Building: string;
+  UnitUniqueNumber: number;
+  Floor: string;
+  UnitNumber: string;
+  UniConfiguration: string;
+  UnitType: string;
+  Area: number;
+  CustomerName: string;
+  CustomerKycAadhaarNumber: number | null;
+  CustomerKycPan: string;
+  CustomerKycMobile: string;
+  CustomerKycEmail: string;
+  CustomerKycAddress: string;
+  SalesBasePrice: number;
+  SalesStampDutyAmount: number;
+  SalesRegistrationAmount: number;
+  SalesOtherChargesAmount: number;
+  SalesPassThroughCharges: number;
+  SalesTaxesAmount: number;
+  SalesTotalAmount: number;
+  MspVarianceAmount: number;
+}
+export interface UnitNocWorkflowUpdateRequest {
+  YearMonth: number;
+  ProjectNumber: number;
+  AssetNumber: number;
+  UnitUniqueNumber: number;
+  WorkflowStatus: string;
+  Comments: string;
+}
