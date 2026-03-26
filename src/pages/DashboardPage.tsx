@@ -227,7 +227,7 @@ function DashboardPage() {
             <div className="d-flex gap-2 flex-wrap justify-content-end align-self-end">
               {isBorrower ? (
                 <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate("/add-disbursement-request")}>
-                  Add
+                  New DR
                 </button>
               ) : null}
               <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => navigate("/approved-disbursement-requests")}>
