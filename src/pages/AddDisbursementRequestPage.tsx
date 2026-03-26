@@ -254,12 +254,12 @@ function AddDisbursementRequestPage() {
           ) : (
             <>
               <div className="mb-3">
-                <label htmlFor="project-select" className="form-label">
+                {/* <label htmlFor="project-select" className="form-label">
                   Project
-                </label>
+                </label> */}
                 <select
                   id="project-select"
-                  className="form-select"
+                  className="form-select form-select-sm"
                   value={selectedProjectNumber}
                   onChange={(e) => setSelectedProjectNumber(e.target.value === "" ? "" : Number(e.target.value))}
                 >
@@ -274,7 +274,7 @@ function AddDisbursementRequestPage() {
               <div>
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="btn btn-sm btn-primary"
                   onClick={handleDownloadTemplate}
                   disabled={templateDownloading || selectedProjectNumber === ""}
                 >
@@ -301,7 +301,7 @@ function AddDisbursementRequestPage() {
             <input
               ref={fileInputRef}
               type="file"
-              className="form-control"
+              className="form-control form-control-sm"
               id="dr-file"
               accept=".xlsx,.xls"
               onChange={handleFileChange}
@@ -319,7 +319,7 @@ function AddDisbursementRequestPage() {
             </label>
             <textarea
               id="dr-remarks"
-              className="form-control"
+              className="form-control form-control-sm"
               rows={3}
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
@@ -329,7 +329,7 @@ function AddDisbursementRequestPage() {
           </div>
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-sm btn-primary"
             onClick={handleUpload}
             disabled={!selectedFile || uploading || uploadSucceeded || selectedProjectNumber === ""}
           >
@@ -352,7 +352,7 @@ function AddDisbursementRequestPage() {
                 <div className="d-flex gap-2 flex-wrap">
                   <button
                     type="button"
-                    className="btn btn-primary"
+                    className="btn btn-sm btn-primary"
                     onClick={handleSubmitForApproval}
                     disabled={!hasDr || isSubmittedForApproval || submitInProgress}
                   >
@@ -360,14 +360,14 @@ function AddDisbursementRequestPage() {
                   </button>
                   <button
                     type="button"
-                    className="btn btn-outline-warning"
+                    className="btn btn-sm btn-outline-warning"
                     onClick={handleRecall}
                     disabled={!hasDr || !isSubmittedForApproval || recallInProgress}
                   >
                     {recallInProgress ? "Recalling..." : "Recall"}
                   </button>
                   {hasDr && (
-                    <button type="button" className="btn btn-outline-danger" onClick={handleDelete} disabled={deleteInProgress}>
+                    <button type="button" className="btn btn-sm btn-outline-danger" onClick={handleDelete} disabled={deleteInProgress}>
                       {deleteInProgress ? "Deleting..." : "Delete"}
                     </button>
                   )}
@@ -427,7 +427,7 @@ function AddDisbursementRequestPage() {
               <input
                 ref={attachmentInputRef}
                 type="file"
-                className="form-control"
+                className="form-control form-control-sm"
                 id="dr-attachment"
                 accept=".zip,.rar"
                 onChange={handleAttachmentFileChange}
@@ -441,7 +441,7 @@ function AddDisbursementRequestPage() {
             </div>
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-sm btn-primary"
               onClick={handleUploadAttachment}
               disabled={!attachmentFile || attachmentUploading || !hasDr}
             >
