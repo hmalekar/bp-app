@@ -18,6 +18,17 @@ import type {
 } from "../api/contracts/types";
 
 const formatMonthLabel = (record: PendingSalesMisRecordDto) => record.NewDueMonthV ?? `${record.NewDueMonth}`;
+const formatYearMonthLabel = (yearMonth: number) => {
+  const value = String(yearMonth ?? "").trim();
+  if (!/^\d{6}$/.test(value)) return value || "-";
+
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(4, 6));
+  if (month < 1 || month > 12) return value;
+
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${monthNames[month - 1]} ${year}`;
+};
 
 /** Single cancellation row (unit + user-entered fields). */
 interface CancellationRowState {
@@ -587,51 +598,42 @@ function UploadSalesMisPage() {
 
   return (
     <div className="d-flex flex-column gap-4">
-      {/* Sub-header: actions + back link right */}
-      <div className="d-flex flex-wrap justify-content-end align-items-center gap-2">
-        <div className="d-flex gap-2">
-          {showRecallButton && (
-            <button type="button" className="btn btn-warning btn-sm" onClick={handleRecall} disabled={isRecalling || isPendingUpload}>
-              {isRecalling ? "Recalling..." : "Recall"}
-            </button>
-          )}
-          <button
-            type="button"
-            className="btn btn-success btn-sm"
-            onClick={handleSubmitForApproval}
-            disabled={isSubmittedForApproval || isSubmitting}
-          >
-            {isSubmitting ? "Submitting..." : "Submit for Approval"}
-          </button>
-        </div>
-        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/pending-workflow")}>
-          ← Back to Pending Workflow
-        </button>
-      </div>
-
-      {/* Page title card – Upload Sales MIS with project details and status */}
-      <div className="card shadow-sm border-0">
-        <div className="card-body">
-          <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
-            <div>
-              <h2 className="h5 mb-1">Upload Sales MIS</h2>
-              <div className="text-muted">
-                {safeRecord.ProjectName} · {safeRecord.BorrowerName}
-              </div>
-              <div className="text-muted small">
-                Project #{safeRecord.ProjectNumber} · Borrower {safeRecord.BorrowerCode}
-              </div>
-              <div className="mt-2">
-                <span className={`badge ${getSalesMisStatusBadgeClass(currentStatus)}`}>Status: {currentStatus}</span>
-              </div>
-            </div>
-            <div className="text-end">
-              <div className="text-muted small">Working month</div>
-              <div>{formatMonthLabel(safeRecord)}</div>
-              <div className="text-muted small mt-2">Last submitted</div>
-              <div>{safeRecord.LastSubmittedMonth}</div>
-            </div>
+      {/* Sub-header: project info left + actions right */}
+      <div className="d-flex flex-wrap justify-content-between align-items-start gap-2">
+        <div className="d-flex flex-wrap align-items-center gap-2 text-muted">
+          <span className="fw-bold text-dark fs-4">Upload Sales MIS</span>
+          <span>·</span>
+          <span>{safeRecord.ProjectName}</span>
+          <span>·</span>
+          <span>{safeRecord.BorrowerName}</span>
+          <span>·</span>
+          <span>Working month: {formatMonthLabel(safeRecord)}</span>
+          <span>·</span>
+          <span>Last submitted: {formatYearMonthLabel(safeRecord.LastSubmittedMonth)}</span>
+          <span>·</span>
+          <div>
+            <span className={`badge ${getSalesMisStatusBadgeClass(currentStatus)}`}>Status: {currentStatus}</span>
           </div>
+        </div>
+        <div className="d-flex flex-wrap justify-content-end align-items-center gap-2">
+          <div className="d-flex gap-2">
+            {showRecallButton && (
+              <button type="button" className="btn btn-warning btn-sm" onClick={handleRecall} disabled={isRecalling || isPendingUpload}>
+                {isRecalling ? "Recalling..." : "Recall"}
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn btn-success btn-sm"
+              onClick={handleSubmitForApproval}
+              disabled={isSubmittedForApproval || isSubmitting}
+            >
+              {isSubmitting ? "Submitting..." : "Submit for Approval"}
+            </button>
+          </div>
+          <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/pending-workflow")}>
+            ← Back to Pending Workflow
+          </button>
         </div>
       </div>
 
@@ -644,7 +646,7 @@ function UploadSalesMisPage() {
       {/* Report cancellations */}
       <div className="card shadow-sm border-0">
         <div className="card-body">
-          <h3 className="h6 mb-3">Report cancellations</h3>
+          <h3 className="h6 mb-3">Step 1: Report cancellations (if any)</h3>
           {!isUploadEnabled && (
             <div className="alert alert-info mb-3">
               Cancellations are disabled. Current status: <strong>{currentStatus}</strong>
@@ -819,13 +821,13 @@ function UploadSalesMisPage() {
       {/* Upload card: Download MIS Excel + file upload */}
       <div className="card shadow-sm border-0">
         <div className="card-body">
-          <h3 className="h6 mb-3">Upload Updated Sales MIS</h3>
+          <h3 className="h6 mb-3">Step 2: Upload Updated Sales MIS</h3>
           <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
-            <button type="button" className="btn btn-primary" onClick={handleDownload} disabled={isDownloading}>
+            <button type="button" className="btn btn-sm btn-primary" onClick={handleDownload} disabled={isDownloading}>
               {isDownloading ? "Downloading..." : "Download MIS Excel"}
             </button>
             <span className="text-muted small">
-              Download the MIS Excel, then upload it back once reviewed. If MIS has been updated for the current month. This will download the latest
+              Download the MIS Excel, then upload it back once updated. If MIS has been updated for the current month. This will download the latest
               MIS Excel.
             </span>
           </div>
@@ -841,7 +843,7 @@ function UploadSalesMisPage() {
             </label>
             <input
               type="file"
-              className="form-control"
+              className="form-control form-control-sm"
               id="misFile"
               accept=".xlsx,.xls"
               onChange={handleFileChange}
@@ -853,7 +855,7 @@ function UploadSalesMisPage() {
               </div>
             )}
           </div>
-          <button className="btn btn-success" onClick={handleImport} disabled={!selectedFile || isImporting || !isUploadEnabled}>
+          <button className="btn btn-sm btn-success" onClick={handleImport} disabled={!selectedFile || isImporting || !isUploadEnabled}>
             {isImporting ? "Importing..." : "Import MIS"}
           </button>
         </div>
@@ -862,9 +864,9 @@ function UploadSalesMisPage() {
       {/* Attachment upload card */}
       <div className="card shadow-sm border-0">
         <div className="card-body">
-          <h3 className="h6 mb-3">Upload attachment</h3>
+          <h3 className="h6 mb-3">Step 3: Upload attachment (if any)</h3>
           <p className="text-muted small mb-2">
-            Upload supporting documents for this Sales MIS as a compressed file (.zip or .rar). This works similarly to the Cost DR attachment.
+            Upload supporting documents for this Sales MIS as a compressed file (.zip or .rar). Only one attachment is allowed.
           </p>
           {!isAttachmentUploadEnabled && (
             <div className="alert alert-info mb-3">
@@ -887,7 +889,7 @@ function UploadSalesMisPage() {
             </label>
             <input
               type="file"
-              className="form-control"
+              className="form-control form-control-sm"
               id="sales-mis-attachment"
               accept=".zip,.rar"
               onChange={handleAttachmentFileChange}
@@ -901,7 +903,7 @@ function UploadSalesMisPage() {
           </div>
           <button
             type="button"
-            className="btn btn-outline-primary"
+            className="btn btn-sm btn-outline-primary"
             onClick={handleUploadAttachment}
             disabled={!attachmentFile || attachmentUploading || !isAttachmentUploadEnabled}
           >
