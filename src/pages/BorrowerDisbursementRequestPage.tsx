@@ -94,7 +94,13 @@ function BorrowerDisbursementRequestPage() {
   const workflowStatusCaption = (dr?.LatestWorkflowStatus ?? lastKnownWorkflowStatus ?? pendingDrFromNav?.LatestWorkflowStatus ?? "").trim();
   const statusDisplay =
     workflowStatusCaption ||
-    (approvalFlag === "S" ? "Submitted for Approval" : approvalFlag === "R" ? "Rejected" : approvalFlag === "A" || approvalFlag === "Y" ? "Approved" : approvalFlag || "—");
+    (approvalFlag === "S"
+      ? "Submitted for Approval"
+      : approvalFlag === "R"
+        ? "Rejected"
+        : approvalFlag === "A" || approvalFlag === "Y"
+          ? "Approved"
+          : approvalFlag || "—");
 
   const isSubmittedForApproval = approvalFlag === "S" || workflowStatusCaption.toLowerCase() === "submitted for approval";
   const isRejected = approvalFlag === "R" || workflowStatusCaption.toLowerCase() === "rejected";
@@ -292,9 +298,7 @@ function BorrowerDisbursementRequestPage() {
                 <strong>Remarks</strong> {dr.Remarks ?? "—"}
                 <span className="text-muted mx-2">·</span>
                 <strong>Status</strong>{" "}
-                <span className={`badge ${getSalesMisStatusBadgeClass(statusDisplay === "—" ? "" : statusDisplay)}`}>
-                  {statusDisplay}
-                </span>
+                <span className={`badge ${getSalesMisStatusBadgeClass(statusDisplay === "—" ? "" : statusDisplay)}`}>{statusDisplay}</span>
               </p>
             </div>
           </div>
@@ -307,14 +311,14 @@ function BorrowerDisbursementRequestPage() {
               <div className="d-flex flex-wrap gap-2 align-items-center mb-3">
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="btn btn-sm btn-primary"
                   onClick={handleSubmitForApproval}
                   disabled={!canSubmitForApproval || submitInProgress || uploadSectionLocked}
                 >
                   {submitInProgress ? "Submitting..." : "Submit for approval"}
                 </button>
                 {isSubmittedForApproval && (
-                  <button type="button" className="btn btn-outline-warning" onClick={handleRecall} disabled={recallInProgress}>
+                  <button type="button" className="btn btn-sm btn-outline-warning" onClick={handleRecall} disabled={recallInProgress}>
                     {recallInProgress ? "Recalling..." : "Recall"}
                   </button>
                 )}
@@ -326,7 +330,8 @@ function BorrowerDisbursementRequestPage() {
               </p>
               <hr className="my-3" />
               <p className="text-muted small mb-2">
-                If the DR has been rejected, you can upload or re-upload an attachment. The previous attachment will be deleted and replaced with the new one.
+                If the DR has been rejected, you can upload or re-upload an attachment. The previous attachment will be deleted and replaced with the
+                new one.
               </p>
               {reuploadError ? <div className="alert alert-danger mb-3">{reuploadError}</div> : null}
               {reuploadSuccess ? <div className="alert alert-success mb-3">{reuploadSuccess}</div> : null}
@@ -337,7 +342,7 @@ function BorrowerDisbursementRequestPage() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  className="form-control"
+                  className="form-control form-control-sm"
                   id="borrower-dr-file"
                   accept=".zip,.rar"
                   onChange={handleFileChange}
@@ -351,7 +356,7 @@ function BorrowerDisbursementRequestPage() {
               </div>
               <button
                 type="button"
-                className="btn btn-outline-primary"
+                className="btn btn-sm btn-outline-primary"
                 onClick={handleReupload}
                 disabled={!reuploadFile || reuploadUploading || !isRejected || uploadSectionLocked}
               >
@@ -415,7 +420,7 @@ function BorrowerDisbursementRequestPage() {
                                 {hasAuditRemarks ? (
                                   <textarea
                                     rows={2}
-                                    className="form-control form-control-sm"
+                                    className="form-control form-control-sm text-wrap"
                                     value={borrowerRemarksByRecord[row.RecordNumber] ?? ""}
                                     onChange={(e) => setBorrowerRemarksByRecord((prev) => ({ ...prev, [row.RecordNumber]: e.target.value }))}
                                     placeholder="Optional response to audit remarks"

@@ -155,17 +155,13 @@ function ManageDisbursementRequestPage() {
       setError("Audit remarks are mandatory when approved amount is not equal to payable amount. Please add remarks for the affected line(s).");
       return;
     }
-    const statuses = records.map((r) => r.Status);
-    const workflowStatus = statuses.every((s) => s === DISBURSEMENT_REQUEST_LINE_STATUS.APPROVED)
-      ? DISBURSEMENT_REQUEST_LINE_STATUS.APPROVED
-      : statuses.every((s) => s === DISBURSEMENT_REQUEST_LINE_STATUS.REJECTED)
-        ? DISBURSEMENT_REQUEST_LINE_STATUS.REJECTED
-        : DISBURSEMENT_REQUEST_LINE_STATUS.PARTIAL;
     setIsApproving(true);
     try {
       const payload: DisbursementRequestWorkflowUpdateRequest = {
         DrNumber: drNumber,
-        WorkflowStatus: workflowStatus,
+        // Approve action always persists approved workflow state.
+        // Partial is a derived line-level status and should not be saved as workflow status.
+        WorkflowStatus: DISBURSEMENT_REQUEST_LINE_STATUS.APPROVED,
         Comments: "",
         Records: records,
       };
