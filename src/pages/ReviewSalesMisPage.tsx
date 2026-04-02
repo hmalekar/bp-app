@@ -10,11 +10,25 @@ import type {
   SalesMisComparisonResultDto,
   SalesMisWorkflowUpdateRequest,
   ValidationResponse,
+  WorkflowRecordDto,
 } from "../api/contracts/types";
 
 const formatMonthLabel = (record: PendingSalesMisRecordDto) => record.NewDueMonthV ?? `${record.NewDueMonth}`;
 
 const formatNumber = (n: number) => (n === 0 ? "0" : n.toLocaleString("en-IN"));
+
+const formatWorkflowDate = (dateValue: string) => {
+  if (!dateValue) return "—";
+  const dt = new Date(dateValue);
+  if (Number.isNaN(dt.getTime())) return dateValue;
+  return dt.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 
 /** Extract error message from caught error; prefer ValidationResponse.Message from API if present. */
 function getWorkflowErrorMessage(caught: unknown, fallback: string): string {
@@ -50,6 +64,9 @@ function ReviewSalesMisPage() {
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectComments, setRejectComments] = useState("");
+  const [workflowHistory, setWorkflowHistory] = useState<WorkflowRecordDto[]>([]);
+  const [isLoadingWorkflowHistory, setIsLoadingWorkflowHistory] = useState(false);
+  const [showWorkflowHistoryDetails, setShowWorkflowHistoryDetails] = useState(false);
 
   useEffect(() => {
     if (!resolvedRecord) return;
@@ -73,6 +90,31 @@ function ReviewSalesMisPage() {
       }
     };
     fetchComparison();
+    return () => {
+      isMounted = false;
+    };
+  }, [resolvedRecord]);
+
+  useEffect(() => {
+    if (!resolvedRecord) return;
+    let isMounted = true;
+    setIsLoadingWorkflowHistory(true);
+    const fetchWorkflowHistory = async () => {
+      try {
+        const data = await apiGet<WorkflowRecordDto[]>(API_ENDPOINTS.SALES_MIS_WORKFLOW_HISTORY, {
+          params: {
+            yearMonth: resolvedRecord.NewDueMonth,
+            projectNumber: resolvedRecord.ProjectNumber,
+          },
+        });
+        if (isMounted) setWorkflowHistory(Array.isArray(data) ? data : []);
+      } catch {
+        if (isMounted) setWorkflowHistory([]);
+      } finally {
+        if (isMounted) setIsLoadingWorkflowHistory(false);
+      }
+    };
+    fetchWorkflowHistory();
     return () => {
       isMounted = false;
     };
@@ -214,36 +256,84 @@ function ReviewSalesMisPage() {
 
   return (
     <div className="d-flex flex-column gap-4">
-      <div className="d-flex justify-content-end">
-        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/pending-workflow")}>
-          ← Back to Pending Workflow
-        </button>
-      </div>
-
-      <div className="card shadow-sm border-0">
-        <div className="card-body">
-          <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
-            <div>
-              <h2 className="h5 mb-1">Review Sales MIS</h2>
-              <div className="text-muted">
-                {resolvedRecord.ProjectName} · {resolvedRecord.BorrowerName}
-              </div>
-              <div className="text-muted small">
-                Project #{resolvedRecord.ProjectNumber} · Borrower {resolvedRecord.BorrowerCode}
-              </div>
-              <div className="mt-2">
-                <span className={`badge ${getSalesMisStatusBadgeClass(currentStatus)}`}>Status: {currentStatus}</span>
-              </div>
-            </div>
-            <div className="text-end">
-              <div className="text-muted small">Working month</div>
-              <div>{formatMonthLabel(resolvedRecord)}</div>
-              <div className="text-muted small mt-2">Last submitted</div>
-              <div>{resolvedRecord.LastSubmittedMonth}</div>
-            </div>
-          </div>
+      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h2 className="h5 mb-0">Review Sales MIS</h2>
+        <div className="d-flex align-items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-outline-secondary btn-sm"
+            onClick={() => setShowWorkflowHistoryDetails((prev) => !prev)}
+          >
+            {showWorkflowHistoryDetails ? "Hide workflow history" : "Show workflow history"}
+          </button>
+          <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/pending-workflow")}>
+            ← Back to Pending Workflow
+          </button>
         </div>
       </div>
+
+      <div className="d-flex align-items-center gap-2 small flex-nowrap overflow-auto pb-1">
+        <span className="text-muted">
+          {resolvedRecord.ProjectName} · {resolvedRecord.BorrowerName}
+        </span>
+        <span className="text-muted">|</span>
+        <span className="text-muted">Project #{resolvedRecord.ProjectNumber}</span>
+        <span className="text-muted">|</span>
+        <span className="text-muted">Borrower {resolvedRecord.BorrowerCode}</span>
+        <span className="text-muted">|</span>
+        <span className={`badge ${getSalesMisStatusBadgeClass(currentStatus)}`}>Status: {currentStatus}</span>
+        <span className="text-muted">|</span>
+        <span className="text-muted">Working month: {formatMonthLabel(resolvedRecord)}</span>
+        <span className="text-muted">|</span>
+        <span className="text-muted">Last submitted: {resolvedRecord.LastSubmittedMonth}</span>
+      </div>
+
+      {showWorkflowHistoryDetails ? (
+        <div className="card shadow-sm border-0">
+          <div className="card-header bg-light d-flex justify-content-between align-items-center">
+            <h3 className="h6 mb-0">Workflow history</h3>
+            <span className="badge bg-secondary">{workflowHistory.length} step(s)</span>
+          </div>
+          <div className="card-body p-2">
+            {isLoadingWorkflowHistory ? (
+              <div className="p-3 text-muted small">Loading workflow history...</div>
+            ) : workflowHistory.length === 0 ? (
+              <div className="p-3 text-muted small">No workflow steps recorded yet.</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-sm table-hover align-middle mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th scope="col">Step</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">User</th>
+                      <th scope="col">Role</th>
+                      <th scope="col">Timestamp</th>
+                      <th scope="col">Comments</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {workflowHistory.map((entry, index) => (
+                      <tr key={`${entry.SerialNo}-${entry.Date}-${index}`}>
+                        <td>{entry.SerialNo}</td>
+                        <td>
+                          <span className={`badge ${getSalesMisStatusBadgeClass(entry.StatusFlag || "Pending Upload")}`}>
+                            {entry.StatusFlag || "—"}
+                          </span>
+                        </td>
+                        <td>{entry.Username || "Unknown user"}</td>
+                        <td>{entry.Role || "—"}</td>
+                        <td>{formatWorkflowDate(entry.Date)}</td>
+                        <td>{entry.Comments?.trim() || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       <div className="card shadow-sm border-0">
         <div className="card-body">
@@ -398,7 +488,7 @@ function ReviewSalesMisPage() {
                 <h3 className="h6 mb-0">Warnings</h3>
                 <span className="badge bg-warning text-dark">{comparison.UnitsWithWarnings.length} unit(s)</span>
               </div>
-              <div className="card-body p-0">
+              <div className="card-body p-2">
                 <div className="table-responsive">
                   <table className="table table-hover align-middle mb-0">
                     <thead className="table-light">
@@ -434,7 +524,7 @@ function ReviewSalesMisPage() {
               <div className="card-header bg-light">
                 <h3 className="h6 mb-0">Amount changes</h3>
               </div>
-              <div className="card-body p-0">
+              <div className="card-body p-2">
                 <div className="table-responsive">
                   <table className="table table-hover align-middle mb-0">
                     <thead className="table-light">

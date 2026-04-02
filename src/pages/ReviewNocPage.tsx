@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiGet, apiPost, downloadFile } from "../api/client";
 import { API_ENDPOINTS } from "../api/contracts/endpoints";
-import type { PendingNocRequestDto, UnitNocWorkflowUpdateRequest, ValidationResponse } from "../api/contracts/types";
+import type { PendingNocRequestDto, UnitNocWorkflowUpdateRequest, ValidationResponse, WorkflowRecordDto } from "../api/contracts/types";
 import { getCurrentUser, getUserRole } from "../api/http";
 import { SALES_MIS_WORKFLOW_STATUS, getSalesMisStatusBadgeClass } from "../constants/salesMisWorkflowStatus";
 
@@ -29,6 +29,9 @@ function ReviewNocPage() {
   const [rowState, setRowState] = useState<Record<string, NocReviewRowState>>({});
   const [rowLoading, setRowLoading] = useState<Record<string, boolean>>({});
   const [downloadLoading, setDownloadLoading] = useState<Record<string, boolean>>({});
+  const [workflowHistoryLoading, setWorkflowHistoryLoading] = useState<Record<string, boolean>>({});
+  const [workflowHistoryByRow, setWorkflowHistoryByRow] = useState<Record<string, WorkflowRecordDto[]>>({});
+  const [showWorkflowHistoryByRow, setShowWorkflowHistoryByRow] = useState<Record<string, boolean>>({});
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   useEffect(() => {
@@ -219,6 +222,46 @@ function ReviewNocPage() {
     return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
+  const formatWorkflowDate = (dateValue: string) => {
+    if (!dateValue) return "—";
+    const dt = new Date(dateValue);
+    if (Number.isNaN(dt.getTime())) return dateValue;
+    return dt.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const handleToggleWorkflowHistory = async (row: PendingNocRequestDto) => {
+    const key = getRowKey(row);
+    const isOpen = showWorkflowHistoryByRow[key] ?? false;
+    if (isOpen) {
+      setShowWorkflowHistoryByRow((prev) => ({ ...prev, [key]: false }));
+      return;
+    }
+    setShowWorkflowHistoryByRow((prev) => ({ ...prev, [key]: true }));
+    if (workflowHistoryByRow[key] != null) return;
+    setWorkflowHistoryLoading((prev) => ({ ...prev, [key]: true }));
+    try {
+      const data = await apiGet<WorkflowRecordDto[]>(API_ENDPOINTS.NOC_WORKFLOW_HISTORY, {
+        params: {
+          yearMonth: row.YearMonth,
+          projectNumber: row.ProjecNumber,
+          assetNumber: row.AssetNumber,
+          unitUniqueNumber: row.UnitUniqueNumber,
+        },
+      });
+      setWorkflowHistoryByRow((prev) => ({ ...prev, [key]: Array.isArray(data) ? data : [] }));
+    } catch {
+      setWorkflowHistoryByRow((prev) => ({ ...prev, [key]: [] }));
+    } finally {
+      setWorkflowHistoryLoading((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
   return (
     <div>
       <div className="d-flex align-items-center justify-content-between mb-3">
@@ -262,6 +305,10 @@ function ReviewNocPage() {
                       const state = rowState[key] ?? { commentary: "", actionComments: "", attachment: null };
                       const inProgress = rowLoading[key] ?? false;
                       const downloadInProgress = downloadLoading[key] ?? false;
+                      const historyLoading = workflowHistoryLoading[key] ?? false;
+                      const showHistory = showWorkflowHistoryByRow[key] ?? false;
+                      const historyRows = workflowHistoryByRow[key] ?? [];
+                      const totalColumns = isBorrower ? 10 : 9;
                       const lastActionUser = (row.LatestWorkflowUser ?? "").trim().toLowerCase();
                       const lockedBySameUserOnFinalState =
                         (isApproved(row.LatestWorkflowStatus) || isRejected(row.LatestWorkflowStatus)) &&
@@ -271,127 +318,183 @@ function ReviewNocPage() {
                       const canSubmit = isBorrower && !rowLocked && !lockedBySameUserOnFinalState;
                       const canRecall = isBorrower && rowLocked && !lockedBySameUserOnFinalState;
                       const hasAttachment = Boolean((row.AttachmentFileName ?? "").trim());
-                      return (
-                        <tr key={key}>
-                          <td>
-                            <div>{row.ProjectName || "—"}</div>
-                            <div className="text-muted small">{row.ProjecNumber}</div>
-                          </td>
-                          <td>
-                            <div>{row.UnitNumber || "—"}</div>
-                            <div className="text-muted small">
-                              {row.Phase || "—"} / {row.Building || "—"} / {row.Floor || "—"}
-                            </div>
-                          </td>
-                          <td>
-                            <div>{row.CustomerName || "—"}</div>
-                            <div className="text-muted small">{row.CustomerKycMobile || row.CustomerKycEmail || "—"}</div>
-                          </td>
-                          <td>{formatMoney(row.SalesTotalAmount)}</td>
-                          <td>
-                            <span className={`badge ${row.MspVarianceAmount < 0 ? "text-bg-danger" : "text-bg-success"}`}>
-                              {formatMoney(row.MspVarianceAmount)}
-                            </span>
-                          </td>
-                          <td>
-                            <span className={`badge ${getSalesMisStatusBadgeClass(row.LatestWorkflowStatus)}`}>
-                              {row.LatestWorkflowStatus || "—"}
-                            </span>
-                          </td>
-                          <td style={{ minWidth: 240 }}>
-                            {isBorrower ? (
-                              <textarea
-                                className="form-control form-control-sm"
-                                rows={2}
-                                value={state.commentary}
-                                placeholder="Enter commentary"
-                                disabled={inProgress || rowLocked || lockedBySameUserOnFinalState}
-                                onChange={(e) => updateRowState(key, (current) => ({ ...current, commentary: e.target.value }))}
-                              />
-                            ) : (
-                              <textarea
-                                className="form-control form-control-sm"
-                                rows={2}
-                                value={state.actionComments}
-                                placeholder="Enter comments"
-                                disabled={inProgress || lockedBySameUserOnFinalState}
-                                onChange={(e) => updateRowState(key, (current) => ({ ...current, actionComments: e.target.value }))}
-                              />
-                            )}
-                          </td>
-                          <td style={{ minWidth: 220 }}>
-                            {hasAttachment ? (
-                              <button
-                                type="button"
-                                className="btn btn-outline-secondary btn-sm"
-                                disabled={downloadInProgress}
-                                onClick={() => handleDownloadAttachment(row)}
-                              >
-                                {downloadInProgress ? "Downloading..." : "Download"}
-                              </button>
-                            ) : (
-                              <span className="text-muted">No attachment</span>
-                            )}
-                          </td>
-                          {isBorrower ? (
-                            <td style={{ minWidth: 260 }}>
-                              <input
-                                type="file"
-                                className="form-control form-control-sm"
-                                accept=".zip,.rar,application/zip,application/x-rar-compressed,application/vnd.rar"
-                                disabled={inProgress || rowLocked || lockedBySameUserOnFinalState}
-                                onChange={(e) => updateRowState(key, (current) => ({ ...current, attachment: e.target.files?.[0] ?? null }))}
-                              />
-                              {state.attachment ? <div className="form-text">{state.attachment.name}</div> : row.AttachmentFileName ? <div className="form-text">Current: {row.AttachmentFileName}</div> : null}
+                      return [
+                          <tr key={`${key}-main`}>
+                            <td>
+                              <div>{row.ProjectName || "—"}</div>
+                              <div className="text-muted small">{row.ProjecNumber}</div>
                             </td>
-                          ) : null}
-                          <td style={{ minWidth: isBorrower ? 250 : 220 }}>
+                            <td>
+                              <div>{row.UnitNumber || "—"}</div>
+                              <div className="text-muted small">
+                                {row.Phase || "—"} / {row.Building || "—"} / {row.Floor || "—"}
+                              </div>
+                            </td>
+                            <td>
+                              <div>{row.CustomerName || "—"}</div>
+                              <div className="text-muted small">{row.CustomerKycMobile || row.CustomerKycEmail || "—"}</div>
+                            </td>
+                            <td>{formatMoney(row.SalesTotalAmount)}</td>
+                            <td>
+                              <span className={`badge ${row.MspVarianceAmount < 0 ? "text-bg-danger" : "text-bg-success"}`}>
+                                {formatMoney(row.MspVarianceAmount)}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`badge ${getSalesMisStatusBadgeClass(row.LatestWorkflowStatus)}`}>
+                                {row.LatestWorkflowStatus || "—"}
+                              </span>
+                            </td>
+                            <td style={{ minWidth: 240 }}>
+                              {isBorrower ? (
+                                <textarea
+                                  className="form-control form-control-sm"
+                                  rows={2}
+                                  value={state.commentary}
+                                  placeholder="Enter commentary"
+                                  disabled={inProgress || rowLocked || lockedBySameUserOnFinalState}
+                                  onChange={(e) => updateRowState(key, (current) => ({ ...current, commentary: e.target.value }))}
+                                />
+                              ) : (
+                                <textarea
+                                  className="form-control form-control-sm"
+                                  rows={2}
+                                  value={state.actionComments}
+                                  placeholder="Enter comments"
+                                  disabled={inProgress || lockedBySameUserOnFinalState}
+                                  onChange={(e) => updateRowState(key, (current) => ({ ...current, actionComments: e.target.value }))}
+                                />
+                              )}
+                            </td>
+                            <td style={{ minWidth: 220 }}>
+                              {hasAttachment ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-outline-secondary btn-sm"
+                                  disabled={downloadInProgress}
+                                  onClick={() => handleDownloadAttachment(row)}
+                                >
+                                  {downloadInProgress ? "Downloading..." : "Download"}
+                                </button>
+                              ) : (
+                                <span className="text-muted">No attachment</span>
+                              )}
+                            </td>
                             {isBorrower ? (
-                              <div className="d-flex gap-2">
+                              <td style={{ minWidth: 260 }}>
+                                <input
+                                  type="file"
+                                  className="form-control form-control-sm"
+                                  accept=".zip,.rar,application/zip,application/x-rar-compressed,application/vnd.rar"
+                                  disabled={inProgress || rowLocked || lockedBySameUserOnFinalState}
+                                  onChange={(e) => updateRowState(key, (current) => ({ ...current, attachment: e.target.files?.[0] ?? null }))}
+                                />
+                                {state.attachment ? <div className="form-text">{state.attachment.name}</div> : row.AttachmentFileName ? <div className="form-text">Current: {row.AttachmentFileName}</div> : null}
+                              </td>
+                            ) : null}
+                            <td style={{ minWidth: isBorrower ? 250 : 220 }}>
+                              <div className="d-flex flex-wrap gap-2">
                                 <button
                                   type="button"
-                                  className="btn btn-primary btn-sm"
-                                  disabled={inProgress || !canSubmit}
-                                  onClick={() => handleBorrowerAction(row, SALES_MIS_WORKFLOW_STATUS.SUBMITTED_FOR_APPROVAL)}
+                                  className="btn btn-outline-secondary btn-sm"
+                                  disabled={historyLoading}
+                                  onClick={() => handleToggleWorkflowHistory(row)}
                                 >
-                                  {inProgress ? "Processing..." : "Submit for Approval"}
+                                  {showHistory ? "Hide history" : historyLoading ? "Loading..." : "Workflow history"}
                                 </button>
-                                <button
-                                  type="button"
-                                  className="btn btn-outline-warning btn-sm"
-                                  disabled={inProgress || !canRecall}
-                                  onClick={() => handleBorrowerAction(row, SALES_MIS_WORKFLOW_STATUS.RECALLED)}
-                                >
-                                  {inProgress ? "Processing..." : "Recall"}
-                                </button>
+                                {isBorrower ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="btn btn-primary btn-sm"
+                                      disabled={inProgress || !canSubmit}
+                                      onClick={() => handleBorrowerAction(row, SALES_MIS_WORKFLOW_STATUS.SUBMITTED_FOR_APPROVAL)}
+                                    >
+                                      {inProgress ? "Processing..." : "Submit for Approval"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-outline-warning btn-sm"
+                                      disabled={inProgress || !canRecall}
+                                      onClick={() => handleBorrowerAction(row, SALES_MIS_WORKFLOW_STATUS.RECALLED)}
+                                    >
+                                      {inProgress ? "Processing..." : "Recall"}
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="btn btn-success btn-sm"
+                                      disabled={inProgress || lockedBySameUserOnFinalState}
+                                      onClick={() => handleApproverAction(row, SALES_MIS_WORKFLOW_STATUS.APPROVED)}
+                                    >
+                                      {inProgress ? "Processing..." : "Approve"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-danger btn-sm"
+                                      disabled={inProgress || lockedBySameUserOnFinalState}
+                                      onClick={() => handleApproverAction(row, SALES_MIS_WORKFLOW_STATUS.REJECTED)}
+                                    >
+                                      {inProgress ? "Processing..." : "Reject"}
+                                    </button>
+                                  </>
+                                )}
                               </div>
-                            ) : (
-                              <div className="d-flex gap-2">
-                                <button
-                                  type="button"
-                                  className="btn btn-success btn-sm"
-                                  disabled={inProgress || lockedBySameUserOnFinalState}
-                                  onClick={() => handleApproverAction(row, SALES_MIS_WORKFLOW_STATUS.APPROVED)}
-                                >
-                                  {inProgress ? "Processing..." : "Approve"}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn btn-danger btn-sm"
-                                  disabled={inProgress || lockedBySameUserOnFinalState}
-                                  onClick={() => handleApproverAction(row, SALES_MIS_WORKFLOW_STATUS.REJECTED)}
-                                >
-                                  {inProgress ? "Processing..." : "Reject"}
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      );
+                            </td>
+                          </tr>,
+                          showHistory ? (
+                            <tr key={`${key}-history`}>
+                              <td colSpan={totalColumns}>
+                                <div className="card border-0 shadow-sm my-2">
+                                  <div className="card-body p-2">
+                                    {historyLoading ? (
+                                      <div className="text-muted small">Loading workflow history...</div>
+                                    ) : historyRows.length === 0 ? (
+                                      <div className="text-muted small">No workflow steps recorded yet.</div>
+                                    ) : (
+                                      <div className="table-responsive">
+                                        <table className="table table-sm table-hover align-middle mb-0">
+                                          <thead className="table-light">
+                                            <tr>
+                                              <th scope="col">Step</th>
+                                              <th scope="col">Status</th>
+                                              <th scope="col">User</th>
+                                              <th scope="col">Role</th>
+                                              <th scope="col">Timestamp</th>
+                                              <th scope="col">Comments</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {historyRows.map((entry, index) => (
+                                              <tr key={`${entry.SerialNo}-${entry.Date}-${index}`}>
+                                                <td>{entry.SerialNo}</td>
+                                                <td>
+                                                  <span className={`badge ${getSalesMisStatusBadgeClass(entry.StatusFlag || "Pending Upload")}`}>
+                                                    {entry.StatusFlag || "—"}
+                                                  </span>
+                                                </td>
+                                                <td>{entry.Username || "Unknown user"}</td>
+                                                <td>{entry.Role || "—"}</td>
+                                                <td>{formatWorkflowDate(entry.Date)}</td>
+                                                <td>{entry.Comments?.trim() || "—"}</td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : null,
+                      ];
                     })}
                   </tbody>
-                </table>
-              </div>
+                  </table>
+                </div>
             )}
           </div>
         </div>

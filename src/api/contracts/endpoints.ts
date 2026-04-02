@@ -9,6 +9,7 @@ export const API_ENDPOINTS = {
   SALES_MIS_UPDATE_COMMENTARY: "/api/v1/sales/mis_update_commentary",
   SALES_MIS_WORKFLOW_UPDATE: "/api/v1/sales/mis_workflow_update",
   SALES_MIS_COMPARE: "/api/v1/sales/mis_compare",
+  SALES_MIS_WORKFLOW_HISTORY: "/api/v1/sales/mis_workflow_history",
   SALES_SOLD_UNITS: "/api/v1/sales/mis_sold_units",
   SALES_CANCELLATION: "/api/v1/sales/sales_cancellation",
   SALES_CANCELLED_UNITS: "/api/v1/sales/cancelled_units",
@@ -24,6 +25,7 @@ export const API_ENDPOINTS = {
   COST_DR_ATTACHMENT: "/api/v1/cost/dr_attachment",
   COST_DR_DOWNLOAD_ATTACHMENT: "/api/v1/cost/dr_download",
   COST_APPROVED_DR: "/api/v1/cost/approved_disbursement_requests",
+  COST_DR_WORKFLOW_HISTORY: "/api/v1/cost/dr_workflow_history",
   EXISTING_SALES_MIS_MONTHS: "/api/v1/sales/sales_mis_months",
   SALES_MIS_ATTACHMENT: "/api/v1/sales/mis_attachment",
   SALES_MIS_ATTACHMENT_DOWNLOAD: "/api/v1/sales/mis_attachment_download",
@@ -32,6 +34,7 @@ export const API_ENDPOINTS = {
   NOC_WORKFLOW_UPDATE: "/api/v1/sales/noc_workflow_update",
   NOC_ATTACHMENT: "/api/v1/sales/noc_attachment",
   NOC_DOWNLOAD_ATTACHMENT: "/api/v1/sales/noc_attachment_download",
+  NOC_WORKFLOW_HISTORY: "/api/v1/sales/noc_workflow_history",
 } as const;
 
 export type ApiEndpointGroup = keyof typeof API_ENDPOINTS;

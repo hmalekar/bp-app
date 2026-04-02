@@ -3,13 +3,14 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { apiGet, apiPost, downloadFile } from "../api/client";
 import { getUserRole } from "../api/http";
 import { API_ENDPOINTS } from "../api/contracts/endpoints";
-import { SALES_MIS_WORKFLOW_STATUS } from "../constants/salesMisWorkflowStatus";
+import { getSalesMisStatusBadgeClass, SALES_MIS_WORKFLOW_STATUS } from "../constants/salesMisWorkflowStatus";
 import { DISBURSEMENT_REQUEST_LINE_STATUS } from "../constants/disbursementRequestStatus";
 import type {
   DisbursementRequestCostRecordDto,
   DisbursementRequestDto,
   DisbursementRequestWorkflowUpdateRequest,
   ValidationResponse,
+  WorkflowRecordDto,
 } from "../api/contracts/types";
 
 /** Parse string to number; allow only digits and one decimal. Returns NaN if invalid or value is undefined/null. */
@@ -57,6 +58,9 @@ function ManageDisbursementRequestPage() {
   /** Committed approved amount per record (updated on blur only); used for row highlight. */
   const [committedApprovedByRecord, setCommittedApprovedByRecord] = useState<Record<number, number>>({});
   const [isExporting, setIsExporting] = useState(false);
+  const [showWorkflowHistoryDetails, setShowWorkflowHistoryDetails] = useState(false);
+  const [workflowHistory, setWorkflowHistory] = useState<WorkflowRecordDto[]>([]);
+  const [isLoadingWorkflowHistory, setIsLoadingWorkflowHistory] = useState(false);
   const role = getUserRole();
   const isBorrower = role === "B";
 
@@ -95,6 +99,30 @@ function ManageDisbursementRequestPage() {
     };
 
     fetchDr();
+    return () => {
+      isMounted = false;
+    };
+  }, [drNumberParam, isBorrower]);
+
+  useEffect(() => {
+    if (isBorrower || drNumberParam == null) return;
+    const drNumber = Number(drNumberParam);
+    if (Number.isNaN(drNumber)) return;
+    let isMounted = true;
+    setIsLoadingWorkflowHistory(true);
+    const fetchWorkflowHistory = async () => {
+      try {
+        const data = await apiGet<WorkflowRecordDto[]>(API_ENDPOINTS.COST_DR_WORKFLOW_HISTORY, {
+          params: { drNumber },
+        });
+        if (isMounted) setWorkflowHistory(Array.isArray(data) ? data : []);
+      } catch {
+        if (isMounted) setWorkflowHistory([]);
+      } finally {
+        if (isMounted) setIsLoadingWorkflowHistory(false);
+      }
+    };
+    fetchWorkflowHistory();
     return () => {
       isMounted = false;
     };
@@ -297,6 +325,18 @@ function ManageDisbursementRequestPage() {
     if (Number.isNaN(date.getTime())) return s;
     return date.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
   };
+  const formatWorkflowDate = (dateValue: string) => {
+    if (!dateValue) return "—";
+    const dt = new Date(dateValue);
+    if (Number.isNaN(dt.getTime())) return dateValue;
+    return dt.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
   const renderDocCell = (row: DisbursementRequestCostRecordDto) => {
     const docType = cell(row.DocumentType);
     const docNo = cell(row.DocumentNumber);
@@ -338,6 +378,11 @@ function ManageDisbursementRequestPage() {
       <div className="d-flex align-items-center justify-content-between mb-3 flex-shrink-0">
         <h2 className="h5 mb-0">Manage Disbursement Request</h2>
         <div className="d-flex gap-2">
+          {dr && (
+            <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setShowWorkflowHistoryDetails((prev) => !prev)}>
+              {showWorkflowHistoryDetails ? "Hide workflow history" : "Show workflow history"}
+            </button>
+          )}
           {dr && (
             <button
               type="button"
@@ -404,6 +449,53 @@ function ManageDisbursementRequestPage() {
               </p>
             </div>
           </div>
+
+          {showWorkflowHistoryDetails ? (
+            <div className="card mb-3 flex-shrink-0">
+              <div className="card-header bg-light d-flex justify-content-between align-items-center">
+                <h3 className="h6 mb-0">Workflow history</h3>
+                <span className="badge bg-secondary">{workflowHistory.length} step(s)</span>
+              </div>
+              <div className="card-body p-2">
+                {isLoadingWorkflowHistory ? (
+                  <div className="p-3 text-muted small">Loading workflow history...</div>
+                ) : workflowHistory.length === 0 ? (
+                  <div className="p-3 text-muted small">No workflow steps recorded yet.</div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table table-sm table-hover align-middle mb-0">
+                      <thead className="table-light">
+                        <tr>
+                          <th scope="col">Step</th>
+                          <th scope="col">Status</th>
+                          <th scope="col">User</th>
+                          <th scope="col">Role</th>
+                          <th scope="col">Timestamp</th>
+                          <th scope="col">Comments</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {workflowHistory.map((entry, index) => (
+                          <tr key={`${entry.SerialNo}-${entry.Date}-${index}`}>
+                            <td>{entry.SerialNo}</td>
+                            <td>
+                              <span className={`badge ${getSalesMisStatusBadgeClass(entry.StatusFlag || "Pending Upload")}`}>
+                                {entry.StatusFlag || "—"}
+                              </span>
+                            </td>
+                            <td>{entry.Username || "Unknown user"}</td>
+                            <td>{entry.Role || "—"}</td>
+                            <td>{formatWorkflowDate(entry.Date)}</td>
+                            <td>{entry.Comments?.trim() || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
 
           <div className="card mb-3">
             <div className="card-header bg-light py-2 d-flex align-items-center">

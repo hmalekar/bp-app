@@ -310,6 +310,12 @@ export interface DisbursementRequestCostRecordDto {
   PayableAmount: number;
   ApprovedAmount: number;
   OutstandingAmount: number;
+  SenderAccountNumber: string;
+  SenderName: string;
+  BeneficiaryAccountNumber: string;
+  BeneficiaryAccountName: string;
+  BeneficiaryIfsc: string;
+  SenderToReceiverInfo: string;
   Status: string;
   ValidationErrors: string;
   AuditRemarks: string;
@@ -442,4 +448,12 @@ export interface UnitNocWorkflowUpdateRequest {
   UnitUniqueNumber: number;
   WorkflowStatus: string;
   Comments: string;
+}
+export interface WorkflowRecordDto {
+  SerialNo: number;
+  Username: string;
+  Role: string;
+  StatusFlag: string;
+  Comments: string;
+  Date: string;
 }
