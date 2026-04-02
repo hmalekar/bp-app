@@ -97,7 +97,8 @@ function AddDisbursementRequestPage() {
     setAttachmentSuccess(null);
   };
 
-  const uploadSucceeded = Boolean(importResult && (importResult.IsValid || importResult.DisbursementRequestNumber != null));
+  // Treat upload as successful only when backend explicitly marks it valid.
+  const uploadSucceeded = Boolean(importResult?.IsValid);
   const drNumber = importResult?.DisbursementRequestNumber ?? null;
   const hasDr = Boolean(uploadSucceeded && drNumber != null);
 
@@ -179,7 +180,8 @@ function AddDisbursementRequestPage() {
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
-      const remarksParam = remarks ?? "";
+      const normalizedRemarks = (remarks ?? "").trim();
+      const remarksParam = (normalizedRemarks.length > 0 ? normalizedRemarks : ".").slice(0, 200);
       const url = `${API_ENDPOINTS.COST_DR_IMPORT}?projectNumber=${encodeURIComponent(selectedProjectNumber)}&remarks=${encodeURIComponent(remarksParam)}`;
       const result = await apiPost<DisbursementRequestImportResult>(url, formData, {
         headers: {
@@ -322,10 +324,12 @@ function AddDisbursementRequestPage() {
               className="form-control form-control-sm"
               rows={3}
               value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
+              onChange={(e) => setRemarks(e.target.value.slice(0, 200))}
+              maxLength={200}
               disabled={uploading || uploadSucceeded || selectedProjectNumber === ""}
               placeholder="Optional remarks for this disbursement request"
             />
+            <div className="form-text mt-1">{remarks.length}/200</div>
           </div>
           <button
             type="button"
@@ -342,7 +346,7 @@ function AddDisbursementRequestPage() {
         <div className="card mb-3">
           <div className="card-body">
             <h3 className="h6 card-title mb-3">Import result</h3>
-            {importResult.IsValid || importResult.DisbursementRequestNumber != null ? (
+            {importResult.IsValid ? (
               <>
                 <div className="alert alert-success mb-3">
                   {importResult.Message?.trim() ||
