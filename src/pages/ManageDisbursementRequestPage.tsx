@@ -39,6 +39,14 @@ function getLineStatus(approved: number, payable: number): "A" | "R" | "P" {
   return "P";
 }
 
+/** Local date as DDMMYYYY (for bank file download filename). */
+function formatDdMmYyyy(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = String(d.getFullYear());
+  return `${dd}${mm}${yyyy}`;
+}
+
 function ManageDisbursementRequestPage() {
   const { drNumber: drNumberParam } = useParams<"drNumber">();
   const location = useLocation();
@@ -58,6 +66,7 @@ function ManageDisbursementRequestPage() {
   /** Committed approved amount per record (updated on blur only); used for row highlight. */
   const [committedApprovedByRecord, setCommittedApprovedByRecord] = useState<Record<number, number>>({});
   const [isExporting, setIsExporting] = useState(false);
+  const [isDownloadingBankFile, setIsDownloadingBankFile] = useState(false);
   const [showWorkflowHistoryDetails, setShowWorkflowHistoryDetails] = useState(false);
   const [workflowHistory, setWorkflowHistory] = useState<WorkflowRecordDto[]>([]);
   const [isLoadingWorkflowHistory, setIsLoadingWorkflowHistory] = useState(false);
@@ -241,6 +250,23 @@ function ManageDisbursementRequestPage() {
     }
   };
 
+  const handleDownloadBankFile = async () => {
+    if (drNumber == null || Number.isNaN(drNumber)) return;
+    setError(null);
+    setIsDownloadingBankFile(true);
+    try {
+      const bankFileName = `Annexure1a_DR_${drNumber}_${formatDdMmYyyy(new Date())}.xlsx`;
+      await downloadFile(API_ENDPOINTS.COST_DR_BANK_FILE_DOWNLOAD, bankFileName, {
+        params: { drNumber },
+      });
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Failed to download bank file";
+      setError(message);
+    } finally {
+      setIsDownloadingBankFile(false);
+    }
+  };
+
   const handleReject = async () => {
     if (drNumber == null || Number.isNaN(drNumber) || !dr?.Records?.length) return;
     const comments = rejectComments.trim();
@@ -403,6 +429,17 @@ function ManageDisbursementRequestPage() {
               aria-label="Download DR as Excel"
             >
               {isExporting ? "Downloading..." : "Export Excel"}
+            </button>
+          )}
+          {dr && (
+            <button
+              type="button"
+              className="btn btn-outline-primary btn-sm"
+              onClick={handleDownloadBankFile}
+              disabled={isDownloadingBankFile}
+              aria-label="Download bank file Excel"
+            >
+              {isDownloadingBankFile ? "Downloading..." : "Download bank file"}
             </button>
           )}
           <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate("/pending-workflow")}>

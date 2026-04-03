@@ -26,6 +26,7 @@ export const API_ENDPOINTS = {
   COST_DR_DOWNLOAD_ATTACHMENT: "/api/v1/cost/dr_download",
   COST_APPROVED_DR: "/api/v1/cost/approved_disbursement_requests",
   COST_DR_WORKFLOW_HISTORY: "/api/v1/cost/dr_workflow_history",
+  COST_DR_BANK_FILE_DOWNLOAD: "/api/v1/cost/dr_bank_file_download",
   EXISTING_SALES_MIS_MONTHS: "/api/v1/sales/sales_mis_months",
   SALES_MIS_ATTACHMENT: "/api/v1/sales/mis_attachment",
   SALES_MIS_ATTACHMENT_DOWNLOAD: "/api/v1/sales/mis_attachment_download",
